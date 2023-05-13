@@ -2,79 +2,89 @@
 
 ## Title: Plex Backup Script
 
+## Author: Pedro Buffon
+
 ## Purpose: Backs up Plex Database Files & Reg Keys
 
 ## Useage: Run as Scheduled Task
 
-## Version: 1.2
+## Version: 2.0
 
-## Last Updated: 2022-10-06
-
-######################################################################################
-
-### Variables to Change if necessary
-
-$RootBackup = "D:\PlexBackups" ### Adjust this to the path of the backup storage
-
-$PlexSvr = "C:\Program Files (x86)\Plex\Plex Media Server" ### Plex .exe location
+## Last Updated: 13/05/2023
 
 ######################################################################################
 
-IF (!(Test-Path -Path $RootBackup)) { New-Item -Path $RootBackup -ItemType Directory -Force } ### Create Folder if it doesn't exist
+Add-Type -AssemblyName System.Windows.Forms
+[System.Windows.Forms.Application]::EnableVisualStyles();
 
-$WEEKDAY = (Get-date).DayOfWeek ### Determine the Day
+function PlexBackup {
+    IF (!(Test-Path -Path $RootBackup)) { New-Item -Path $RootBackup -ItemType Directory -Force } ### Create Folder if it doesn't exist
 
-$DAY = Get-Date
-$DAY = $DAY.ToString("dd-MM-yyyy") ### Determine the date that the backup was created
+    $WEEKDAY = (Get-date).DayOfWeek ### Determine the Day
 
-$WEEKDAYDestination = -join($RootBackup,"\","$WEEKDAY " + $DAY,"-Backup") ### Create Day Folder Path
+    $DAY = Get-Date
+    $DAY = $DAY.ToString("dd-MM-yyyy") ### Determine the date that the backup was created
 
-IF (!(Test-Path -Path $WEEKDAYDestination)) { New-Item -Path $WEEKDAYDestination -ItemType Directory -Force } ### Create Day Folder if it doesn't exist
+    $WEEKDAYDestination = -join($RootBackup,"\","$WEEKDAY " + $DAY,"-Backup") ### Create Day Folder Path
 
-$LogDestination = -join ($WEEKDAYDestination,"\Logs") ### Set Path for Log Backup Folder
+    IF (!(Test-Path -Path $WEEKDAYDestination)) { New-Item -Path $WEEKDAYDestination -ItemType Directory -Force } ### Create Day Folder if it doesn't exist
 
-IF (!(Test-Path -Path $LogDestination)) { New-Item -Path $LogDestination -Force -ItemType Directory} ### Create Log Folder if it doesn't exist
+    $LogDestination = -join ($WEEKDAYDestination,"\Logs") ### Set Path for Log Backup Folder
 
-$PlexReg = "HKEY_CURRENT_USER\Software\Plex, Inc." ### Variable for Registry Path
+    IF (!(Test-Path -Path $LogDestination)) { New-Item -Path $LogDestination -Force -ItemType Directory} ### Create Log Folder if it doesn't exist
 
-$RegDestination = -join ($WEEKDAYDestination,"\RegBackup") ### Set Path for Registry Backup Folder
+    $PlexReg = "HKEY_CURRENT_USER\Software\Plex, Inc." ### Variable for Registry Path
 
-IF (!(Test-Path -Path $RegDestination)) { New-Item -Path $RegDestination -Force -ItemType Directory} ### Create Registry Backup Folder if it doesn't exist
+    $RegDestination = -join ($WEEKDAYDestination,"\RegBackup") ### Set Path for Registry Backup Folder
 
-$RegDestination = -join ($RegDestination,"\Regbackup-",$WEEKDAY,".reg") ### Set Path for Backup .Reg File
+    IF (!(Test-Path -Path $RegDestination)) { New-Item -Path $RegDestination -Force -ItemType Directory} ### Create Registry Backup Folder if it doesn't exist
 
-IF ((Test-Path -Path $RegDestination)) { Remove-Item -Path $RegDestination -Force } ### If a previous backup exists, delete it.
+    $RegDestination = -join ($RegDestination,"\Regbackup-",$WEEKDAY,".reg") ### Set Path for Backup .Reg File
 
-Invoke-Command { Reg Export $($PlexReg.Replace(":","")) $RegDestination } ### Backup The Registry Key
+    IF ((Test-Path -Path $RegDestination)) { Remove-Item -Path $RegDestination -Force } ### If a previous backup exists, delete it.
 
-$PlexDataPath = "C:\Users\Pedro Buffon\AppData\Local\" ### Get Plex Appdata Path from Registry
+    Invoke-Command { Reg Export $($PlexReg.Replace(":","")) $RegDestination } ### Backup The Registry Key
 
-$FileDestination = -join ($WEEKDAYDestination,"\FileBackup") ### Create Appdata Folder Backup Path
+    $PlexDataPath = "C:\Users\%USERNAME%\AppData\local\" ### Get Plex Appdata Path from Registry
 
-IF (!(Test-Path -Path $FileDestination)) { New-Item -Path $FileDestination -ItemType Directory -Force } ### If Appdata Backup Folder Doesn't Exist, Create it.
+    $FileDestination = -join ($WEEKDAYDestination,"\FileBackup") ### Create Appdata Folder Backup Path
 
-$Source = "$($PlexDataPath)\Plex Media Server" ### Set Source for Robocopy Command
+    IF (!(Test-Path -Path $FileDestination)) { New-Item -Path $FileDestination -ItemType Directory -Force } ### If Appdata Backup Folder Doesn't Exist, Create it.
 
-$Exclude = "$($Source)\Cache" ### Exclude Cache Folder
+    $Source = "$($PlexDataPath)\Plex Media Server" ### Set Source for Robocopy Command
 
-Stop-Process -Name 'Plex Media Server' -Force -ErrorAction SilentlyContinue ### Stop Plex Server
+    $Exclude = "$($Source)\Cache" ### Exclude Cache Folder
 
-Invoke-Command {Robocopy.exe $Source $FileDestination /Mir /R:1 /W:1 /XD $Exclude /log:$LogDestination\LogBackup-$WEEKDAY.txt} ### Perform a Mirror Style Backup, Excluing the Cache Directory.
+    Stop-Process -Name 'Plex Media Server' -Force -ErrorAction SilentlyContinue ### Stop Plex Server
 
-$Plexsvr = -join ($PlexSvr,"\Plex Media Server.exe") ### Add .exe to Variable
+    Invoke-Command {Robocopy.exe $Source $FileDestination /Mir /R:1 /W:1 /XD $Exclude /log:$LogDestination\LogBackup-$WEEKDAY.txt} ### Perform a Mirror Style Backup, Excluing the Cache Directory.
 
-Start-Process -FilePath $PlexSvr ### Start Plex Server
+    $Plexsvr = -join ("C:\Program Files (x86)\Plex\Plex Media Server","\Plex Media Server.exe") ### Add .exe to Variable
 
-### Windows popup
-# Add-Type -AssemblyName System.Windows.Forms
-# $global:balloon = New-Object System.Windows.Forms.NotifyIcon
-# $path = (Get-Process -id $pid).Path
-# $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($path)
-# $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Warning
-# $balloon.BalloonTipText = 'Plex Backup has finished sucessfully'
-# $balloon.BalloonTipTitle = "$Env:USERNAME"
-# $balloon.Visible = $true
-# $balloon.ShowBalloonTip(5000)
+    Start-Process -FilePath $PlexSvr ### Start Plex Server
 
-$wshell = New-Object -ComObject Wscript.Shell 
-$Output = $wshell.Popup("Plex Backup has finished sucessfully")
+    [System.Windows.Forms.MessageBox]::Show("Plex Backup has finished sucessfully, see logs in $LogDestination ", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::Ok, [System.Windows.Forms.MessageBoxIcon]::Question)
+}
+
+function ChoosePath{
+    $browser = New-Object System.Windows.Forms.FolderBrowserDialog
+    $null = $browser.ShowDialog()
+    $path = $browser.SelectedPath
+    if (!$string){
+        [System.Windows.Forms.MessageBox]::Show("You can always run the script to backup your Plex Server ;)", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Question)
+        exit
+    }
+    return $path
+}
+
+[System.Windows.Forms.MessageBox]::Show("Choose a folder where the backup will be saved", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Question)
+
+$RootBackup = ChoosePath ### Adjust this to the path of the backup storage
+
+$result = [System.Windows.Forms.MessageBox]::Show("Do you still want to backup to $RootBackup", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
+
+if ($result -eq "Yes") {
+    PlexBackup
+}else{
+    [System.Windows.Forms.MessageBox]::Show("Rerun the script to choose the correct folder", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Question)
+}
