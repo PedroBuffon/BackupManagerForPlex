@@ -45,19 +45,17 @@ function PlexBackup {
 
     Invoke-Command { Reg Export $($PlexReg.Replace(":","")) $RegDestination } ### Backup The Registry Key
 
-    $PlexDataPath = "C:\Users\%USERNAME%\AppData\local\" ### Get Plex Appdata Path from Registry
-
     $FileDestination = -join ($WEEKDAYDestination,"\FileBackup") ### Create Appdata Folder Backup Path
 
     IF (!(Test-Path -Path $FileDestination)) { New-Item -Path $FileDestination -ItemType Directory -Force } ### If Appdata Backup Folder Doesn't Exist, Create it.
 
-    $Source = "$($PlexDataPath)\Plex Media Server" ### Set Source for Robocopy Command
+    $Source = "$($env:LOCALAPPDATA)\Plex Media Server" ### Set Source for Robocopy Command
 
     $Exclude = "$($Source)\Cache" ### Exclude Cache Folder
 
     Stop-Process -Name 'Plex Media Server' -Force -ErrorAction SilentlyContinue ### Stop Plex Server
 
-    Invoke-Command {Robocopy.exe $Source $FileDestination /Mir /R:1 /W:1 /XD $Exclude /log:$LogDestination\LogBackup-$WEEKDAY.txt} ### Perform a Mirror Style Backup, Excluing the Cache Directory.
+    Robocopy.exe $Source $FileDestination /Mir /R:1 /W:1 /XD $Exclude /log:$LogDestination\LogBackup-$WEEKDAY.txt ### Perform a Mirror Style Backup, Excluing the Cache Directory.
 
     $Plexsvr = -join ("C:\Program Files (x86)\Plex\Plex Media Server","\Plex Media Server.exe") ### Add .exe to Variable
 
@@ -70,7 +68,8 @@ function ChoosePath{
     $browser = New-Object System.Windows.Forms.FolderBrowserDialog
     $null = $browser.ShowDialog()
     $path = $browser.SelectedPath
-    if (!$string){
+
+    if (!$path){
         [System.Windows.Forms.MessageBox]::Show("You can always run the script to backup your Plex Server ;)", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Question)
         exit
     }
