@@ -69,7 +69,7 @@ function  getConfiguration {
     # Full path of the file
     $file = "$PSScriptRoot\config.ini"
 
-    #If the file does not exist, create it.
+    #If the config file does not exist, create it.
     if (-not(Test-Path -Path $file -PathType Leaf)) {
         try {
 
@@ -96,7 +96,7 @@ BackupPath=""$path"""
             throw $_.Exception.Message
         }
     }
-    # If the file already exists, show the message and do nothing.
+    # If the config file already exists, execute the backup instead of asking for the path
     else {
         Get-Content "config.ini" | foreach-object -begin {$h=@{}} -process { $k = [regex]::split($_,'='); if(($k[0].CompareTo("") -ne 0) -and ($k[0].StartsWith("[") -ne $True)) { $h.Add($k[0], $k[1]) } }
         $RootBackup = $h.Get_Item("BackupPath")
