@@ -88,8 +88,11 @@ function  getConfiguration {
             if ($result -eq "Yes") {
                 $null = New-Item -ItemType File -Path $file -Force -ErrorAction Stop
                 echo > $file "[Locations]
-BackupPath=""$path"""
+BackupPath=$path"
                 [System.Windows.Forms.MessageBox]::Show("The config file has been created on [$file].", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Question)
+                Get-Content "config.ini" | foreach-object -begin {$h=@{}} -process { $k = [regex]::split($_,'='); if(($k[0].CompareTo("") -ne 0) -and ($k[0].StartsWith("[") -ne $True)) { $h.Add($k[0], $k[1]) } }
+                $RootBackup = $h.Get_Item("BackupPath")
+                PlexBackup
             }
         }
         catch {
