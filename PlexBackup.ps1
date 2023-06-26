@@ -18,6 +18,7 @@ Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles();
 
 function PlexBackup {
+
     IF (!(Test-Path -Path $RootBackup)) { New-Item -Path $RootBackup -ItemType Directory -Force } ### Create Folder if it doesn't exist
 
     $WEEKDAY = (Get-date).DayOfWeek ### Determine the Day
@@ -64,26 +65,43 @@ function PlexBackup {
     [System.Windows.Forms.MessageBox]::Show("Plex Backup has finished sucessfully, see logs in $LogDestination ", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::Ok, [System.Windows.Forms.MessageBoxIcon]::Question)
 }
 
-function ChoosePath{
-    $browser = New-Object System.Windows.Forms.FolderBrowserDialog
-    $null = $browser.ShowDialog()
-    $path = $browser.SelectedPath
+function  getConfiguration {
+    # Full path of the file
+    $file = "$PSScriptRoot\config.ini"
 
-    if (!$path){
-        [System.Windows.Forms.MessageBox]::Show("You can always run the script to backup your Plex Server ;)", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Question)
-        exit
+    #If the file does not exist, create it.
+    if (-not(Test-Path -Path $file -PathType Leaf)) {
+        try {
+
+            [System.Windows.Forms.MessageBox]::Show("Choose a folder where the backup will be saved", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Question)
+            $browser = New-Object System.Windows.Forms.FolderBrowserDialog
+            $null = $browser.ShowDialog()
+            $path = $browser.SelectedPath
+        
+            if (!$path){
+                [System.Windows.Forms.MessageBox]::Show("You can always run the script to backup your Plex Server ;)", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Question)
+                exit
+            }
+        
+            $result = [System.Windows.Forms.MessageBox]::Show("Do you still want to backup to $path", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
+        
+            if ($result -eq "Yes") {
+                $null = New-Item -ItemType File -Path $file -Force -ErrorAction Stop
+                echo > $file "[Locations]
+BackupPath=""$path"""
+                [System.Windows.Forms.MessageBox]::Show("The config file has been created on [$file].", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Question)
+            }
+        }
+        catch {
+            throw $_.Exception.Message
+        }
     }
-    return $path
+    # If the file already exists, show the message and do nothing.
+    else {
+        Get-Content "config.ini" | foreach-object -begin {$h=@{}} -process { $k = [regex]::split($_,'='); if(($k[0].CompareTo("") -ne 0) -and ($k[0].StartsWith("[") -ne $True)) { $h.Add($k[0], $k[1]) } }
+        $RootBackup = $h.Get_Item("BackupPath")
+        PlexBackup
+    }
 }
 
-[System.Windows.Forms.MessageBox]::Show("Choose a folder where the backup will be saved", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Question)
-
-$RootBackup = ChoosePath ### Adjust this to the path of the backup storage
-
-$result = [System.Windows.Forms.MessageBox]::Show("Do you still want to backup to $RootBackup", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
-
-if ($result -eq "Yes") {
-    PlexBackup
-}else{
-    [System.Windows.Forms.MessageBox]::Show("Rerun the script to choose the correct folder", "Plex Backup", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Question)
-}
+getConfiguration
