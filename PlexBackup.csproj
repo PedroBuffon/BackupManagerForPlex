@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <StartupObject>PlexBackupApp.PlexBackupForm</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="PlexBackup.cs" />
+  </ItemGroup>
+
+</Project>
