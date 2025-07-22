@@ -37,6 +37,7 @@ namespace PlexBackupApp
         public bool ShowNotifications { get; set; } = true;
         public bool AutoStartWithWindows { get; set; } = false;
         public string LogLevel { get; set; } = "Info"; // Debug, Info, Warning, Error
+        public bool HasShownTrayNotification { get; set; } = false;
     }
 
     public partial class PlexBackupForm : Form
@@ -60,6 +61,7 @@ namespace PlexBackupApp
         private CheckBox chkIncludeFiles;
         private CheckBox chkIncludeLogs;
         private CheckBox chkStopPlex;
+        private CheckBox chkMinimizeToTray;
         private ComboBox cmbRetentionDays;
         private ProgressBar progressBar;
         private RichTextBox txtLog;
@@ -67,6 +69,13 @@ namespace PlexBackupApp
         private Button btnViewBackups;
         private Button btnRestoreBackup;
         private Button btnSettings;
+        
+        // System Tray Components
+        private NotifyIcon notifyIcon;
+        private ContextMenuStrip trayContextMenu;
+        private ToolStripMenuItem trayShowItem;
+        private ToolStripMenuItem trayBackupNowItem;
+        private ToolStripMenuItem trayExitItem;
 
         [STAThread]
         public static void Main()
@@ -84,6 +93,7 @@ namespace PlexBackupApp
             config = new PlexBackupConfig();
             
             InitializeComponent();
+            InitializeSystemTray();
             LoadConfiguration();
         }
 
@@ -156,7 +166,7 @@ namespace PlexBackupApp
             var optionsPanel = new FlowLayoutPanel
             {
                 FlowDirection = FlowDirection.TopDown,
-                Height = 120,
+                Height = 140,
                 Dock = DockStyle.Fill
             };
 
@@ -164,8 +174,10 @@ namespace PlexBackupApp
             chkIncludeFiles = new CheckBox { Text = "Include File Backup", Checked = true, AutoSize = true };
             chkIncludeLogs = new CheckBox { Text = "Include Previous Logs", Checked = false, AutoSize = true };
             chkStopPlex = new CheckBox { Text = "Stop Plex During Backup", Checked = true, AutoSize = true };
+            chkMinimizeToTray = new CheckBox { Text = "Minimize to System Tray", Checked = false, AutoSize = true };
+            chkMinimizeToTray.CheckedChanged += ChkMinimizeToTray_CheckedChanged;
 
-            optionsPanel.Controls.AddRange(new Control[] { chkIncludeRegistry, chkIncludeFiles, chkIncludeLogs, chkStopPlex });
+            optionsPanel.Controls.AddRange(new Control[] { chkIncludeRegistry, chkIncludeFiles, chkIncludeLogs, chkStopPlex, chkMinimizeToTray });
 
             // Retention Section
             var lblRetention = new Label
@@ -297,6 +309,41 @@ namespace PlexBackupApp
             LogMessage("Plex Backup Manager v3.0 - Ready for operation", Color.White);
         }
 
+        private void InitializeSystemTray()
+        {
+            // Create context menu for system tray
+            trayContextMenu = new ContextMenuStrip();
+            
+            trayShowItem = new ToolStripMenuItem("Show Plex Backup Manager");
+            trayShowItem.Click += TrayShowItem_Click;
+            trayShowItem.Font = new Font(trayShowItem.Font, FontStyle.Bold);
+            
+            trayBackupNowItem = new ToolStripMenuItem("Backup Now");
+            trayBackupNowItem.Click += TrayBackupNowItem_Click;
+            
+            trayExitItem = new ToolStripMenuItem("Exit");
+            trayExitItem.Click += TrayExitItem_Click;
+            
+            trayContextMenu.Items.AddRange(new ToolStripItem[] {
+                trayShowItem,
+                new ToolStripSeparator(),
+                trayBackupNowItem,
+                new ToolStripSeparator(),
+                trayExitItem
+            });
+
+            // Create system tray icon
+            notifyIcon = new NotifyIcon();
+            notifyIcon.Icon = SystemIcons.Application;
+            notifyIcon.Text = "Plex Backup Manager";
+            notifyIcon.ContextMenuStrip = trayContextMenu;
+            notifyIcon.DoubleClick += NotifyIcon_DoubleClick;
+            
+            // Handle form events for minimize to tray
+            this.Resize += PlexBackupForm_Resize;
+            this.FormClosing += PlexBackupForm_FormClosing;
+        }
+
         // Event Handlers
         private void BtnBrowse_Click(object sender, EventArgs e)
         {
@@ -357,6 +404,30 @@ namespace PlexBackupApp
             }
         }
 
+        private void ChkMinimizeToTray_CheckedChanged(object sender, EventArgs e)
+        {
+            config.MinimizeToTray = chkMinimizeToTray.Checked;
+            notifyIcon.Visible = config.MinimizeToTray;
+            SaveConfiguration();
+            
+            if (config.MinimizeToTray)
+            {
+                LogMessage("Minimize to tray enabled - close button will minimize instead of exit", Color.Yellow);
+                
+                // Show notification only if it's the first time this option is enabled
+                if (!config.HasShownTrayNotification && config.ShowNotifications)
+                {
+                    ShowTrayNotification("Plex Backup Manager will now minimize to system tray when closed", ToolTipIcon.Info);
+                    config.HasShownTrayNotification = true;
+                    SaveConfiguration();
+                }
+            }
+            else
+            {
+                LogMessage("Minimize to tray disabled - close button will exit application", Color.Yellow);
+            }
+        }
+
         private void BtnScheduleBackup_Click(object sender, EventArgs e)
         {
             var scheduleForm = new ScheduleBackupForm();
@@ -390,6 +461,104 @@ namespace PlexBackupApp
                 LoadConfigurationToUI();
                 SaveConfiguration();
             }
+        }
+
+        // System Tray Event Handlers
+        private void TrayShowItem_Click(object sender, EventArgs e)
+        {
+            ShowForm();
+        }
+
+        private void TrayBackupNowItem_Click(object sender, EventArgs e)
+        {
+            if (this.WindowState == FormWindowState.Minimized)
+            {
+                // Perform backup silently in the background
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(config.BackupPath))
+                        {
+                            await Task.Run(() => PerformPlexBackup());
+                            ShowTrayNotification("Backup completed successfully!", ToolTipIcon.Info);
+                        }
+                        else
+                        {
+                            ShowTrayNotification("No backup path configured!", ToolTipIcon.Warning);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        ShowTrayNotification($"Backup failed: {ex.Message}", ToolTipIcon.Error);
+                    }
+                });
+            }
+            else
+            {
+                // If window is visible, use the regular backup button click
+                BtnBackupNow_Click(sender, e);
+            }
+        }
+
+        private void TrayExitItem_Click(object sender, EventArgs e)
+        {
+            ExitApplication();
+        }
+
+        private void NotifyIcon_DoubleClick(object sender, EventArgs e)
+        {
+            ShowForm();
+        }
+
+        private void PlexBackupForm_Resize(object sender, EventArgs e)
+        {
+            if (config.MinimizeToTray && this.WindowState == FormWindowState.Minimized)
+            {
+                this.Hide();
+                notifyIcon.Visible = true;
+                
+                // Don't show notification every time - only when first enabled
+                // The notification is now handled in ChkMinimizeToTray_CheckedChanged
+            }
+        }
+
+        private void PlexBackupForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (config.MinimizeToTray && e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                this.WindowState = FormWindowState.Minimized;
+            }
+            else
+            {
+                ExitApplication();
+            }
+        }
+
+        // System Tray Helper Methods
+        private void ShowForm()
+        {
+            this.Show();
+            this.WindowState = FormWindowState.Normal;
+            this.BringToFront();
+            this.Activate();
+            notifyIcon.Visible = config.MinimizeToTray; // Keep visible if minimize to tray is enabled
+        }
+
+        private void ShowTrayNotification(string message, ToolTipIcon icon)
+        {
+            if (config.ShowNotifications && notifyIcon.Visible)
+            {
+                notifyIcon.ShowBalloonTip(3000, "Plex Backup Manager", message, icon);
+            }
+        }
+
+        private void ExitApplication()
+        {
+            notifyIcon.Visible = false;
+            notifyIcon.Dispose();
+            Application.Exit();
         }
 
         // Core Backup Methods
@@ -722,10 +891,16 @@ namespace PlexBackupApp
                     config.IncludeRegistry = bool.Parse(configDict["IncludeRegistry"]);
                 if (configDict.ContainsKey("IncludeFiles"))
                     config.IncludeFiles = bool.Parse(configDict["IncludeFiles"]);
+                if (configDict.ContainsKey("IncludeLogs"))
+                    config.IncludeLogs = bool.Parse(configDict["IncludeLogs"]);
                 if (configDict.ContainsKey("StopPlex"))
                     config.StopPlex = bool.Parse(configDict["StopPlex"]);
+                if (configDict.ContainsKey("MinimizeToTray"))
+                    config.MinimizeToTray = bool.Parse(configDict["MinimizeToTray"]);
                 if (configDict.ContainsKey("RetentionDays"))
                     config.RetentionDays = int.Parse(configDict["RetentionDays"]);
+                if (configDict.ContainsKey("HasShownTrayNotification"))
+                    config.HasShownTrayNotification = bool.Parse(configDict["HasShownTrayNotification"]);
 
                 LogMessage("Configuration loaded from INI file", Color.Gray);
             }
@@ -745,9 +920,16 @@ namespace PlexBackupApp
             chkIncludeFiles.Checked = config.IncludeFiles;
             chkIncludeLogs.Checked = config.IncludeLogs;
             chkStopPlex.Checked = config.StopPlex;
+            chkMinimizeToTray.Checked = config.MinimizeToTray;
             
             if (config.RetentionDays >= 0 && config.RetentionDays < cmbRetentionDays.Items.Count)
                 cmbRetentionDays.SelectedIndex = config.RetentionDays;
+
+            // Apply system tray configuration
+            if (config.MinimizeToTray)
+            {
+                notifyIcon.Visible = true;
+            }
 
             // Log some statistics if available
             if (config.LastBackup != DateTime.MinValue)
@@ -767,6 +949,7 @@ namespace PlexBackupApp
                 config.IncludeFiles = chkIncludeFiles.Checked;
                 config.IncludeLogs = chkIncludeLogs.Checked;
                 config.StopPlex = chkStopPlex.Checked;
+                config.MinimizeToTray = chkMinimizeToTray.Checked;
                 config.RetentionDays = cmbRetentionDays.SelectedIndex;
 
                 // Save as JSON (preferred format)
@@ -812,7 +995,9 @@ namespace PlexBackupApp
                     $"IncludeFiles={config.IncludeFiles}",
                     $"IncludeLogs={config.IncludeLogs}",
                     $"StopPlex={config.StopPlex}",
-                    $"RetentionDays={config.RetentionDays}"
+                    $"MinimizeToTray={config.MinimizeToTray}",
+                    $"RetentionDays={config.RetentionDays}",
+                    $"HasShownTrayNotification={config.HasShownTrayNotification}"
                 };
 
                 File.WriteAllLines(configIniPath, configLines);
