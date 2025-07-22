@@ -29,7 +29,6 @@ namespace PlexBackupApp
         public bool IncludeLogs { get; set; } = false;
         public bool StopPlex { get; set; } = true;
         public int RetentionDays { get; set; } = 2; // Index for combobox (30 days default)
-        public bool UseJsonConfig { get; set; } = true;
         public DateTime LastBackup { get; set; } = DateTime.MinValue;
         public int TotalBackupsCreated { get; set; } = 0;
         public List<string> CustomPlexPaths { get; set; } = new List<string>();
@@ -44,7 +43,6 @@ namespace PlexBackupApp
     {
         private PlexBackupConfig config;
         private string configJsonPath;
-        private string configIniPath;
         private string rootBackup;
         private const string PlexRegistryPath = @"HKEY_CURRENT_USER\Software\Plex, Inc.";
         private readonly string[] PlexExecutablePaths = {
@@ -89,7 +87,6 @@ namespace PlexBackupApp
         {
             // Initialize configuration paths
             configJsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
-            configIniPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.ini");
             config = new PlexBackupConfig();
             
             InitializeComponent();
@@ -818,17 +815,10 @@ namespace PlexBackupApp
         {
             try
             {
-                // Try to load JSON config first (modern format)
+                // Load JSON configuration
                 if (File.Exists(configJsonPath))
                 {
                     LoadJsonConfiguration();
-                }
-                // Fall back to INI config for backward compatibility
-                else if (File.Exists(configIniPath))
-                {
-                    LoadIniConfiguration();
-                    // Convert to JSON and save
-                    SaveJsonConfiguration();
                 }
                 else
                 {
@@ -861,52 +851,6 @@ namespace PlexBackupApp
             catch (Exception ex)
             {
                 LogMessage($"Warning: Failed to load JSON configuration: {ex.Message}", Color.Orange);
-                config = new PlexBackupConfig();
-            }
-        }
-
-        private void LoadIniConfiguration()
-        {
-            try
-            {
-                var configLines = File.ReadAllLines(configIniPath);
-                var configDict = new Dictionary<string, string>();
-
-                foreach (var line in configLines)
-                {
-                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("["))
-                        continue;
-
-                    var parts = line.Split('=');
-                    if (parts.Length == 2)
-                    {
-                        configDict[parts[0].Trim()] = parts[1].Trim();
-                    }
-                }
-
-                // Map INI values to config object
-                if (configDict.ContainsKey("BackupPath"))
-                    config.BackupPath = configDict["BackupPath"];
-                if (configDict.ContainsKey("IncludeRegistry"))
-                    config.IncludeRegistry = bool.Parse(configDict["IncludeRegistry"]);
-                if (configDict.ContainsKey("IncludeFiles"))
-                    config.IncludeFiles = bool.Parse(configDict["IncludeFiles"]);
-                if (configDict.ContainsKey("IncludeLogs"))
-                    config.IncludeLogs = bool.Parse(configDict["IncludeLogs"]);
-                if (configDict.ContainsKey("StopPlex"))
-                    config.StopPlex = bool.Parse(configDict["StopPlex"]);
-                if (configDict.ContainsKey("MinimizeToTray"))
-                    config.MinimizeToTray = bool.Parse(configDict["MinimizeToTray"]);
-                if (configDict.ContainsKey("RetentionDays"))
-                    config.RetentionDays = int.Parse(configDict["RetentionDays"]);
-                if (configDict.ContainsKey("HasShownTrayNotification"))
-                    config.HasShownTrayNotification = bool.Parse(configDict["HasShownTrayNotification"]);
-
-                LogMessage("Configuration loaded from INI file", Color.Gray);
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"Warning: Failed to load INI configuration: {ex.Message}", Color.Orange);
                 config = new PlexBackupConfig();
             }
         }
@@ -952,11 +896,8 @@ namespace PlexBackupApp
                 config.MinimizeToTray = chkMinimizeToTray.Checked;
                 config.RetentionDays = cmbRetentionDays.SelectedIndex;
 
-                // Save as JSON (preferred format)
+                // Save as JSON
                 SaveJsonConfiguration();
-                
-                // Also maintain INI for backward compatibility
-                SaveIniConfiguration();
             }
             catch (Exception ex)
             {
@@ -980,31 +921,6 @@ namespace PlexBackupApp
             catch (Exception ex)
             {
                 LogMessage($"Warning: Failed to save JSON configuration: {ex.Message}", Color.Orange);
-            }
-        }
-
-        private void SaveIniConfiguration()
-        {
-            try
-            {
-                var configLines = new List<string>
-                {
-                    "[Settings]",
-                    $"BackupPath={config.BackupPath}",
-                    $"IncludeRegistry={config.IncludeRegistry}",
-                    $"IncludeFiles={config.IncludeFiles}",
-                    $"IncludeLogs={config.IncludeLogs}",
-                    $"StopPlex={config.StopPlex}",
-                    $"MinimizeToTray={config.MinimizeToTray}",
-                    $"RetentionDays={config.RetentionDays}",
-                    $"HasShownTrayNotification={config.HasShownTrayNotification}"
-                };
-
-                File.WriteAllLines(configIniPath, configLines);
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"Warning: Failed to save INI configuration: {ex.Message}", Color.Orange);
             }
         }
 

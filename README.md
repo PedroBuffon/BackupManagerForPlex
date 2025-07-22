@@ -103,29 +103,27 @@ BackupPath/
 │   └── ...
 ```
 
-## 🔧 Automatic Configuration
+## 🔧 Configuration
 
-The application automatically saves configuration in two formats:
+The application automatically saves configuration in JSON format:
 
-### JSON Configuration (Preferred)
-- **Modern format** with structured data
-- **Enhanced settings** including statistics and advanced options
-- **Automatic backup** of configuration settings
+### JSON Configuration
+
+- **Modern structured format** with enhanced data organization
+- **Complete settings** including statistics and advanced options
+- **Automatic backup** of all configuration settings
 - **File**: `config.json`
 
-### INI Configuration (Legacy Support)
-- **Backward compatibility** with older versions
-- **Simple key-value** format
-- **File**: `config.ini`
-
 ### Configuration Features
+
 - Selected backup path and all UI options
 - **Backup statistics** (last backup date, total backups created)
 - **Advanced settings** (custom Plex paths, log levels, UI preferences)
-- **Automatic migration** from INI to JSON format
-- **Dual format support** for maximum compatibility
+- **System tray settings** (minimize behavior, notifications)
+- **Automatic creation** when no configuration exists
 
 ### Sample JSON Configuration
+
 ```json
 {
   "backupPath": "C:\\Backups\\Plex",
@@ -142,7 +140,8 @@ The application automatically saves configuration in two formats:
   "minimizeToTray": false,
   "showNotifications": true,
   "autoStartWithWindows": false,
-  "logLevel": "Info"
+  "logLevel": "Info",
+  "hasShownTrayNotification": false
 }
 ```
 
