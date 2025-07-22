@@ -98,9 +98,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ github.ref_name }}
-        name: Plex Backup Manager ${{ github.ref_name }}
+        name: ${{ github.ref_name }}
         body: |
-          ## Plex Backup Manager Release ${{ github.ref_name }}
           
           ### 🆕 New Features:
           - **Rollback System**: Automatic rollback when backup fails
