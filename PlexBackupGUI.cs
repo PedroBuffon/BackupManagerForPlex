@@ -37,6 +37,22 @@ namespace PlexBackupApp
         public bool AutoStartWithWindows { get; set; } = false;
         public string LogLevel { get; set; } = "Info"; // Debug, Info, Warning, Error
         public bool HasShownTrayNotification { get; set; } = false;
+        public bool EnableRollback { get; set; } = true;
+        public int MaxRollbackAttempts { get; set; } = 3;
+    }
+
+    // Rollback state management
+    public class BackupRollbackState
+    {
+        public bool PlexWasRunning { get; set; } = false;
+        public string BackupDestination { get; set; } = "";
+        public List<string> CreatedDirectories { get; set; } = new List<string>();
+        public List<string> CreatedFiles { get; set; } = new List<string>();
+        public Dictionary<string, string> OriginalFileBackups { get; set; } = new Dictionary<string, string>();
+        public DateTime BackupStartTime { get; set; } = DateTime.Now;
+        public bool RegistryBackupCompleted { get; set; } = false;
+        public bool FileBackupCompleted { get; set; } = false;
+        public string TempRollbackPath { get; set; } = "";
     }
 
     public partial class PlexBackupForm : Form
@@ -44,6 +60,7 @@ namespace PlexBackupApp
         private PlexBackupConfig config;
         private string configJsonPath;
         private string rootBackup;
+        private BackupRollbackState rollbackState;
         private const string PlexRegistryPath = @"HKEY_CURRENT_USER\Software\Plex, Inc.";
         private readonly string[] PlexExecutablePaths = {
             @"C:\Program Files (x86)\Plex\Plex Media Server\Plex Media Server.exe",
@@ -60,6 +77,7 @@ namespace PlexBackupApp
         private CheckBox chkIncludeLogs;
         private CheckBox chkStopPlex;
         private CheckBox chkMinimizeToTray;
+        private CheckBox chkEnableRollback;
         private ComboBox cmbRetentionDays;
         private ProgressBar progressBar;
         private RichTextBox txtLog;
@@ -163,7 +181,7 @@ namespace PlexBackupApp
             var optionsPanel = new FlowLayoutPanel
             {
                 FlowDirection = FlowDirection.TopDown,
-                Height = 140,
+                Height = 165,
                 Dock = DockStyle.Fill
             };
 
@@ -173,8 +191,9 @@ namespace PlexBackupApp
             chkStopPlex = new CheckBox { Text = "Stop Plex During Backup", Checked = true, AutoSize = true };
             chkMinimizeToTray = new CheckBox { Text = "Minimize to System Tray", Checked = false, AutoSize = true };
             chkMinimizeToTray.CheckedChanged += ChkMinimizeToTray_CheckedChanged;
+            chkEnableRollback = new CheckBox { Text = "Enable Automatic Rollback on Failure", Checked = true, AutoSize = true };
 
-            optionsPanel.Controls.AddRange(new Control[] { chkIncludeRegistry, chkIncludeFiles, chkIncludeLogs, chkStopPlex, chkMinimizeToTray });
+            optionsPanel.Controls.AddRange(new Control[] { chkIncludeRegistry, chkIncludeFiles, chkIncludeLogs, chkStopPlex, chkMinimizeToTray, chkEnableRollback });
 
             // Retention Section
             var lblRetention = new Label
@@ -561,9 +580,21 @@ namespace PlexBackupApp
         // Core Backup Methods
         public void PerformPlexBackup()
         {
+            rollbackState = new BackupRollbackState();
+            
             try
             {
                 LogMessage("Starting Plex backup operation...", Color.White);
+                
+                // Initialize rollback system
+                if (config.EnableRollback)
+                {
+                    InitializeRollbackSystem();
+                }
+
+                // Check if Plex is running before we start
+                rollbackState.PlexWasRunning = IsPlexRunning();
+                LogMessage($"Plex server status: {(rollbackState.PlexWasRunning ? "Running" : "Stopped")}", Color.Gray);
 
                 // Create root backup folder if it doesn't exist
                 if (!Directory.Exists(config.BackupPath))
@@ -578,11 +609,13 @@ namespace PlexBackupApp
 
                 // Create day folder path
                 var weekdayDestination = Path.Combine(config.BackupPath, $"{weekday} {day}-Backup");
+                rollbackState.BackupDestination = weekdayDestination;
 
                 // Create day folder if it doesn't exist
                 if (!Directory.Exists(weekdayDestination))
                 {
                     Directory.CreateDirectory(weekdayDestination);
+                    rollbackState.CreatedDirectories.Add(weekdayDestination);
                     LogMessage($"Created backup folder: {weekdayDestination}", Color.Yellow);
                 }
 
@@ -593,6 +626,7 @@ namespace PlexBackupApp
                 if (!Directory.Exists(logDestination))
                 {
                     Directory.CreateDirectory(logDestination);
+                    rollbackState.CreatedDirectories.Add(logDestination);
                 }
 
                 // Perform backups based on selected options
@@ -606,12 +640,14 @@ namespace PlexBackupApp
                 {
                     LogMessage("Backing up registry...", Color.Cyan);
                     BackupRegistry(weekdayDestination, weekday);
+                    rollbackState.RegistryBackupCompleted = true;
                 }
 
                 if (chkIncludeFiles.Checked)
                 {
                     LogMessage("Backing up files...", Color.Cyan);
                     BackupFiles(weekdayDestination, logDestination, weekday);
+                    rollbackState.FileBackupCompleted = true;
                 }
 
                 if (chkStopPlex.Checked)
@@ -620,11 +656,25 @@ namespace PlexBackupApp
                     StartPlexServer();
                 }
 
+                // Clean up rollback temp files on success
+                if (config.EnableRollback)
+                {
+                    CleanupRollbackSystem();
+                }
+
                 LogMessage($"Backup completed successfully! Files saved to: {weekdayDestination}", Color.LightGreen);
             }
             catch (Exception ex)
             {
                 LogMessage($"Backup error: {ex.Message}", Color.Red);
+                
+                // Perform rollback if enabled
+                if (config.EnableRollback)
+                {
+                    LogMessage("Initiating rollback due to backup failure...", Color.Orange);
+                    PerformRollback();
+                }
+                
                 throw;
             }
         }
@@ -640,14 +690,18 @@ namespace PlexBackupApp
                 if (!Directory.Exists(regDestination))
                 {
                     Directory.CreateDirectory(regDestination);
+                    rollbackState?.CreatedDirectories.Add(regDestination);
                 }
 
                 // Set path for backup .reg file
                 var regFilePath = Path.Combine(regDestination, $"Regbackup-{weekday}.reg");
 
-                // If a previous backup exists, delete it
-                if (File.Exists(regFilePath))
+                // If a previous backup exists, create rollback copy
+                if (File.Exists(regFilePath) && config.EnableRollback && rollbackState != null)
                 {
+                    var rollbackFilePath = Path.Combine(rollbackState.TempRollbackPath, $"Regbackup-{weekday}_original.reg");
+                    File.Copy(regFilePath, rollbackFilePath, true);
+                    rollbackState.OriginalFileBackups[regFilePath] = rollbackFilePath;
                     File.Delete(regFilePath);
                 }
 
@@ -673,6 +727,9 @@ namespace PlexBackupApp
                     throw new Exception($"Registry export failed with exit code: {regExportProcess.ExitCode}");
                 }
 
+                // Track created file for rollback
+                rollbackState?.CreatedFiles.Add(regFilePath);
+
                 LogMessage("Registry backup completed", Color.LightBlue);
             }
             catch (Exception ex)
@@ -692,6 +749,7 @@ namespace PlexBackupApp
                 if (!Directory.Exists(fileDestination))
                 {
                     Directory.CreateDirectory(fileDestination);
+                    rollbackState?.CreatedDirectories.Add(fileDestination);
                 }
 
                 // Set source for robocopy command
@@ -700,13 +758,16 @@ namespace PlexBackupApp
                 // Exclude cache folder
                 var exclude = Path.Combine(source, "Cache");
 
+                // Create log file path and track for rollback
+                var logFilePath = Path.Combine(logDestination, $"LogBackup-{weekday}.txt");
+                
                 // Perform a mirror style backup, excluding the cache directory
                 var robocopyProcess = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = "robocopy",
-                        Arguments = $"\"{source}\" \"{fileDestination}\" /MIR /R:1 /W:1 /XD \"{exclude}\" /log:\"{Path.Combine(logDestination, $"LogBackup-{weekday}.txt")}\"",
+                        Arguments = $"\"{source}\" \"{fileDestination}\" /MIR /R:1 /W:1 /XD \"{exclude}\" /log:\"{logFilePath}\"",
                         UseShellExecute = false,
                         CreateNoWindow = true,
                         RedirectStandardOutput = true,
@@ -722,6 +783,9 @@ namespace PlexBackupApp
                 {
                     throw new Exception($"Robocopy failed with exit code: {robocopyProcess.ExitCode}");
                 }
+
+                // Track created log file for rollback
+                rollbackState?.CreatedFiles.Add(logFilePath);
 
                 LogMessage("File backup completed", Color.LightBlue);
             }
@@ -810,6 +874,173 @@ namespace PlexBackupApp
             }
         }
 
+        // Rollback System Methods
+        private void InitializeRollbackSystem()
+        {
+            try
+            {
+                // Create temporary rollback directory
+                rollbackState.TempRollbackPath = Path.Combine(Path.GetTempPath(), $"PlexBackupRollback_{DateTime.Now:yyyyMMdd_HHmmss}");
+                Directory.CreateDirectory(rollbackState.TempRollbackPath);
+                
+                LogMessage("Rollback system initialized", Color.Gray);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Warning: Failed to initialize rollback system: {ex.Message}", Color.Orange);
+            }
+        }
+
+        private bool IsPlexRunning()
+        {
+            try
+            {
+                var plexProcesses = Process.GetProcessesByName("Plex Media Server");
+                return plexProcesses.Length > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void PerformRollback()
+        {
+            try
+            {
+                LogMessage("Starting rollback operation...", Color.Yellow);
+                var rollbackSuccess = true;
+
+                // Restore Plex service state
+                if (rollbackState.PlexWasRunning && !IsPlexRunning())
+                {
+                    try
+                    {
+                        LogMessage("Restoring Plex server state (starting)...", Color.Yellow);
+                        StartPlexServer();
+                    }
+                    catch (Exception ex)
+                    {
+                        LogMessage($"Failed to restore Plex server: {ex.Message}", Color.Red);
+                        rollbackSuccess = false;
+                    }
+                }
+                else if (!rollbackState.PlexWasRunning && IsPlexRunning())
+                {
+                    try
+                    {
+                        LogMessage("Restoring Plex server state (stopping)...", Color.Yellow);
+                        StopPlexServer();
+                    }
+                    catch (Exception ex)
+                    {
+                        LogMessage($"Failed to restore Plex server state: {ex.Message}", Color.Red);
+                        rollbackSuccess = false;
+                    }
+                }
+
+                // Restore any backed up files (if any were modified during backup)
+                foreach (var backup in rollbackState.OriginalFileBackups)
+                {
+                    try
+                    {
+                        if (File.Exists(backup.Value))
+                        {
+                            File.Copy(backup.Value, backup.Key, true);
+                            LogMessage($"Restored file: {backup.Key}", Color.Yellow);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogMessage($"Failed to restore file {backup.Key}: {ex.Message}", Color.Red);
+                        rollbackSuccess = false;
+                    }
+                }
+
+                // Remove any files created during failed backup
+                foreach (var file in rollbackState.CreatedFiles)
+                {
+                    try
+                    {
+                        if (File.Exists(file))
+                        {
+                            File.Delete(file);
+                            LogMessage($"Removed created file: {file}", Color.Yellow);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogMessage($"Failed to remove file {file}: {ex.Message}", Color.Red);
+                        rollbackSuccess = false;
+                    }
+                }
+
+                // Remove any directories created during failed backup (in reverse order)
+                for (int i = rollbackState.CreatedDirectories.Count - 1; i >= 0; i--)
+                {
+                    try
+                    {
+                        var dir = rollbackState.CreatedDirectories[i];
+                        if (Directory.Exists(dir) && IsDirectoryEmpty(dir))
+                        {
+                            Directory.Delete(dir);
+                            LogMessage($"Removed created directory: {dir}", Color.Yellow);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogMessage($"Failed to remove directory {rollbackState.CreatedDirectories[i]}: {ex.Message}", Color.Red);
+                        rollbackSuccess = false;
+                    }
+                }
+
+                // Clean up rollback system
+                CleanupRollbackSystem();
+
+                if (rollbackSuccess)
+                {
+                    LogMessage("Rollback completed successfully", Color.LightGreen);
+                }
+                else
+                {
+                    LogMessage("Rollback completed with some warnings - manual intervention may be required", Color.Orange);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Critical error during rollback: {ex.Message}", Color.Red);
+                LogMessage("Manual system recovery may be required", Color.Red);
+            }
+        }
+
+        private void CleanupRollbackSystem()
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(rollbackState.TempRollbackPath) && Directory.Exists(rollbackState.TempRollbackPath))
+                {
+                    Directory.Delete(rollbackState.TempRollbackPath, true);
+                    LogMessage("Rollback temporary files cleaned up", Color.Gray);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Warning: Failed to cleanup rollback temp files: {ex.Message}", Color.Orange);
+            }
+        }
+
+        private bool IsDirectoryEmpty(string path)
+        {
+            try
+            {
+                return !Directory.EnumerateFileSystemEntries(path).Any();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         // Configuration Methods
         private void LoadConfiguration()
         {
@@ -865,6 +1096,7 @@ namespace PlexBackupApp
             chkIncludeLogs.Checked = config.IncludeLogs;
             chkStopPlex.Checked = config.StopPlex;
             chkMinimizeToTray.Checked = config.MinimizeToTray;
+            chkEnableRollback.Checked = config.EnableRollback;
             
             if (config.RetentionDays >= 0 && config.RetentionDays < cmbRetentionDays.Items.Count)
                 cmbRetentionDays.SelectedIndex = config.RetentionDays;
@@ -894,6 +1126,7 @@ namespace PlexBackupApp
                 config.IncludeLogs = chkIncludeLogs.Checked;
                 config.StopPlex = chkStopPlex.Checked;
                 config.MinimizeToTray = chkMinimizeToTray.Checked;
+                config.EnableRollback = chkEnableRollback.Checked;
                 config.RetentionDays = cmbRetentionDays.SelectedIndex;
 
                 // Save as JSON
@@ -1034,6 +1267,8 @@ namespace PlexBackupApp
         private CheckBox chkMinimizeToTray;
         private CheckBox chkShowNotifications;
         private CheckBox chkAutoStartWithWindows;
+        private CheckBox chkEnableRollback;
+        private NumericUpDown nudMaxRollbackAttempts;
         private ComboBox cmbLogLevel;
         private ListBox lstCustomPlexPaths;
         private Button btnAddPath;
@@ -1061,7 +1296,7 @@ namespace PlexBackupApp
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 8,
+                RowCount = 10,
                 Padding = new Padding(10)
             };
 
@@ -1070,6 +1305,19 @@ namespace PlexBackupApp
             chkMinimizeToTray = new CheckBox { Text = "Minimize to system tray", AutoSize = true };
             chkShowNotifications = new CheckBox { Text = "Show backup notifications", AutoSize = true };
             chkAutoStartWithWindows = new CheckBox { Text = "Auto start with Windows", AutoSize = true };
+
+            // Rollback Settings
+            var lblRollbackSettings = new Label { Text = "Rollback Settings:", Font = new Font("Arial", 10F, FontStyle.Bold), AutoSize = true };
+            chkEnableRollback = new CheckBox { Text = "Enable automatic rollback on backup failure", AutoSize = true };
+            
+            var lblMaxAttempts = new Label { Text = "Max Rollback Attempts:", AutoSize = true };
+            nudMaxRollbackAttempts = new NumericUpDown 
+            { 
+                Minimum = 1, 
+                Maximum = 10, 
+                Value = 3, 
+                Width = 60 
+            };
 
             // Log Level
             var lblLogLevel = new Label { Text = "Log Level:", Font = new Font("Arial", 10F, FontStyle.Bold), AutoSize = true };
@@ -1103,13 +1351,21 @@ namespace PlexBackupApp
             mainPanel.SetColumnSpan(chkShowNotifications, 2);
             mainPanel.Controls.Add(chkAutoStartWithWindows, 0, 3);
             mainPanel.SetColumnSpan(chkAutoStartWithWindows, 2);
-            mainPanel.Controls.Add(lblLogLevel, 0, 4);
-            mainPanel.Controls.Add(cmbLogLevel, 1, 4);
-            mainPanel.Controls.Add(lblCustomPaths, 0, 5);
+            
+            mainPanel.Controls.Add(lblRollbackSettings, 0, 4);
+            mainPanel.SetColumnSpan(lblRollbackSettings, 2);
+            mainPanel.Controls.Add(chkEnableRollback, 0, 5);
+            mainPanel.SetColumnSpan(chkEnableRollback, 2);
+            mainPanel.Controls.Add(lblMaxAttempts, 0, 6);
+            mainPanel.Controls.Add(nudMaxRollbackAttempts, 1, 6);
+            
+            mainPanel.Controls.Add(lblLogLevel, 0, 7);
+            mainPanel.Controls.Add(cmbLogLevel, 1, 7);
+            mainPanel.Controls.Add(lblCustomPaths, 0, 8);
             mainPanel.SetColumnSpan(lblCustomPaths, 2);
-            mainPanel.Controls.Add(lstCustomPlexPaths, 0, 6);
+            mainPanel.Controls.Add(lstCustomPlexPaths, 0, 9);
             mainPanel.SetColumnSpan(lstCustomPlexPaths, 2);
-            mainPanel.Controls.Add(pathButtonPanel, 0, 7);
+            mainPanel.Controls.Add(pathButtonPanel, 0, 10);
             mainPanel.SetColumnSpan(pathButtonPanel, 2);
 
             this.Controls.Add(mainPanel);
@@ -1121,6 +1377,8 @@ namespace PlexBackupApp
             chkMinimizeToTray.Checked = config.MinimizeToTray;
             chkShowNotifications.Checked = config.ShowNotifications;
             chkAutoStartWithWindows.Checked = config.AutoStartWithWindows;
+            chkEnableRollback.Checked = config.EnableRollback;
+            nudMaxRollbackAttempts.Value = config.MaxRollbackAttempts;
             
             var logLevelIndex = new string[] { "Debug", "Info", "Warning", "Error" }.ToList().IndexOf(config.LogLevel);
             cmbLogLevel.SelectedIndex = logLevelIndex >= 0 ? logLevelIndex : 1; // Default to Info
@@ -1164,6 +1422,8 @@ namespace PlexBackupApp
             config.MinimizeToTray = chkMinimizeToTray.Checked;
             config.ShowNotifications = chkShowNotifications.Checked;
             config.AutoStartWithWindows = chkAutoStartWithWindows.Checked;
+            config.EnableRollback = chkEnableRollback.Checked;
+            config.MaxRollbackAttempts = (int)nudMaxRollbackAttempts.Value;
             config.LogLevel = cmbLogLevel.SelectedItem?.ToString() ?? "Info";
             
             config.CustomPlexPaths.Clear();
