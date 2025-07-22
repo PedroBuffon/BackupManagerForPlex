@@ -2,115 +2,135 @@
 # This workflow builds and tests the Plex Backup Manager Windows Forms application
 # Built on .NET 9.0 with Windows Forms support
 
-name: Create Plex Backup Manager Build Release
+name: Plex Backup Manager Build
 
 on:
   push:
     tags:
-      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+      - 'v*' # Push events to matching v*, i.e. v1.0.0, v20.15.10
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
-    strategy:
-      matrix:
-        configuration: [Debug, Release]
-
+    name: Build and Test
     runs-on: windows-latest
 
-    env:
-      Solution_Name: PlexBackup.sln
-      Project_Path: PlexBackup.csproj
-
     steps:
-    - name: Checkout
+    - name: '📄 Checkout'
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     # Install .NET 9.0
-    - name: Setup .NET
+    - name: '🔧 Setup .NET'
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 9.0.x
 
     # Restore dependencies
-    - name: Restore dependencies
-      run: dotnet restore $env:Solution_Name
+    - name: '📦 Restore dependencies'
+      run: dotnet restore PlexBackup.sln
 
     # Build the application
-    - name: Build
-      run: dotnet build $env:Solution_Name --configuration ${{ matrix.configuration }} --no-restore
+    - name: '🔨 Build'
+      run: dotnet build PlexBackup.sln --configuration Release --no-restore
 
     # Test the application (if tests exist)
-    - name: Test
-      run: dotnet test $env:Solution_Name --configuration ${{ matrix.configuration }} --no-build --verbosity normal
+    - name: '🧪 Test'
+      run: dotnet test PlexBackup.sln --configuration Release --no-build --verbosity normal
       continue-on-error: true
 
-    # Publish the application
-    - name: Publish
-      run: dotnet publish $env:Project_Path --configuration ${{ matrix.configuration }} --output ./publish --no-build
-
-    # Copy additional files
-    - name: Copy configuration files
-      run: |
-        Copy-Item "config.json.example" "./publish/" -ErrorAction SilentlyContinue
-        Copy-Item "README.md" "./publish/" -ErrorAction SilentlyContinue
-
-    # Upload build artifacts
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: PlexBackup-${{ matrix.configuration }}
-        path: ./publish
-
-  # Create release on main branch push (Release configuration only)
   release:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    name: Create Release
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: windows-latest
     permissions:
       contents: write
 
     steps:
-    - name: Download Release artifacts
-      uses: actions/download-artifact@v4
+    - name: '📄 Checkout'
+      uses: actions/checkout@v4
+
+    - name: '🔧 Setup .NET'
+      uses: actions/setup-dotnet@v4
       with:
-        name: PlexBackup-Release
-        path: ./release
+        dotnet-version: 9.0.x
 
-    - name: Create ZIP package
-      id: package
+    - name: '📦 Package windows x64'
       run: |
-        $version = "v$(Get-Date -Format 'yyyy.MM.dd.HHmm')"
-        Compress-Archive -Path "./release/*" -DestinationPath "PlexBackup.zip"
-        echo "version=$version" >> $env:GITHUB_OUTPUT
-        echo "package_name=PlexBackup.zip" >> $env:GITHUB_OUTPUT
+        dotnet publish PlexBackup.csproj -r win-x64 -c Release -o bin/win-x64 --self-contained false
+        Copy-Item "config.json.example" "bin/win-x64/" -ErrorAction SilentlyContinue
+        Copy-Item "README.md" "bin/win-x64/" -ErrorAction SilentlyContinue
+        Copy-Item "ROLLBACK.md" "bin/win-x64/" -ErrorAction SilentlyContinue
+        Compress-Archive -Path "bin/win-x64/*" -DestinationPath "PlexBackup-win-x64.zip"
 
-    - name: Create Release
-      id: create_release
+    - name: '📦 Package windows x86'
+      run: |
+        dotnet publish PlexBackup.csproj -r win-x86 -c Release -o bin/win-x86 --self-contained false
+        Copy-Item "config.json.example" "bin/win-x86/" -ErrorAction SilentlyContinue
+        Copy-Item "README.md" "bin/win-x86/" -ErrorAction SilentlyContinue
+        Copy-Item "ROLLBACK.md" "bin/win-x86/" -ErrorAction SilentlyContinue
+        Compress-Archive -Path "bin/win-x86/*" -DestinationPath "PlexBackup-win-x86.zip"
+
+    - name: '📦 Package windows arm64'
+      run: |
+        dotnet publish PlexBackup.csproj -r win-arm64 -c Release -o bin/win-arm64 --self-contained false
+        Copy-Item "config.json.example" "bin/win-arm64/" -ErrorAction SilentlyContinue
+        Copy-Item "README.md" "bin/win-arm64/" -ErrorAction SilentlyContinue
+        Copy-Item "ROLLBACK.md" "bin/win-arm64/" -ErrorAction SilentlyContinue
+        Compress-Archive -Path "bin/win-arm64/*" -DestinationPath "PlexBackup-win-arm64.zip"
+
+    - name: '🚀 Create Release'
       uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.ref }}
-        name: Release ${{ github.ref }}
+        tag_name: ${{ github.ref_name }}
+        name: Plex Backup Manager ${{ github.ref_name }}
         body: |
-
-          ### Features:
-          - Added rollback functionality when backup fails
-          - Improved error handling and logging
+          ## Plex Backup Manager Release ${{ github.ref_name }}
           
-          ### Installation:
-          1. Download the ZIP file
-          2. Extract to desired location
-          3. Run PlexBackup.exe
+          ### 🆕 New Features:
+          - **Rollback System**: Automatic rollback when backup fails
+          - **Enhanced UI**: Improved settings and configuration options
+          - **System Tray**: Minimize to system tray functionality
+          - **JSON Configuration**: Modern configuration format
           
-          ### Requirements:
-          - Windows OS
-          - .NET 9.0 Runtime
-        files: ${{ steps.package.outputs.package_name }}
+          ### 🔧 Improvements:
+          - Better error handling and logging
+          - Comprehensive backup validation
+          - Enhanced file and registry backup processes
+          - Automatic cleanup of old backups
+          
+          ### 📦 Available Packages:
+          - **win-x64**: For 64-bit Windows systems (Recommended)
+          - **win-x86**: For 32-bit Windows systems
+          - **win-arm64**: For ARM64 Windows systems
+          
+          ### 📋 Installation:
+          1. Download the appropriate ZIP file for your system architecture
+          2. Extract to your desired location
+          3. Run `PlexBackup.exe`
+          4. Configure your backup settings
+          
+          ### ⚙️ System Requirements:
+          - Windows 10/11 or Windows Server 2019+
+          - .NET 9.0 Runtime (will be prompted to install if missing)
+          - Plex Media Server installed
+          
+          ### 🆘 Support:
+          - Check `README.md` for basic usage instructions
+          - Check `ROLLBACK.md` for rollback feature documentation
+          - Report issues on GitHub
+        files: |
+          PlexBackup-win-x64.zip
+          PlexBackup-win-x86.zip
+          PlexBackup-win-arm64.zip
         draft: false
         prerelease: false

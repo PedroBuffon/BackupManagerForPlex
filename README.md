@@ -1,8 +1,8 @@
-# Plex Backup Manager v1.0 (GUI Version)
+# Plex Backup Manager v1.0.0 (GUI Version)
 
 A modern and complete Windows Forms application for backing up Plex Media Server database files and registry keys.
 
-## 🚀 Features v1.0
+## 🚀 Features v1.0.0
 
 ### Complete Graphical Interface
 

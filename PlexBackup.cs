@@ -60,7 +60,7 @@ namespace PlexBackupApp
 
         private void InitializeComponent()
         {
-            this.Text = "Plex Backup Manager v1.0";
+            this.Text = "Plex Backup Manager v1.0.0";
             this.Size = new Size(800, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -265,7 +265,7 @@ namespace PlexBackupApp
             this.Controls.Add(mainPanel);
 
             // Add welcome message to log
-            LogMessage("Plex Backup Manager v1.0 - Ready for operation", Color.White);
+            LogMessage("Plex Backup Manager v1.0.0 - Ready for operation", Color.White);
         }
         {
             try
