@@ -1,8 +1,22 @@
-# Plex Backup Manager v1.0.0 (GUI Version)
+# Plex Backup Manager
+
+> [!WARNING]
+> This is app is still in development and bugs/errors can occur middle run.
+> Use it at your own risk.
 
 A modern and complete Windows Forms application for backing up Plex Media Server database files and registry keys.
 
-## 🚀 Features v1.0.0
+## 📋 Future Roadmap
+
+- [ ] Complete scheduling implementation
+- [ ] Automatic restore functionality  
+- [ ] Incremental backup
+- [ ] Backup compression
+- [ ] Cloud backup (OneDrive, Google Drive)
+- [ ] Email notifications
+- [ ] Dark/light theme
+
+## 🚀 Features
 
 ### Complete Graphical Interface
 
@@ -18,7 +32,7 @@ A modern and complete Windows Forms application for backing up Plex Media Server
 - ✅ **Include Previous Logs** - Optional to include old logs
 - ✅ **Stop Plex During Backup** - Control over service stopping
 
-### Retention Management
+### Retention Management (Still in Development)
 
 - **Automatic cleanup** of old backups
 - **Retention options**: 7, 14, 30, 60 days or never delete
@@ -145,34 +159,6 @@ The application automatically saves configuration in JSON format:
 }
 ```
 
-## 🎨 Interface Improvements
-
-### Visual
-
-- **Organized colors** by operation type
-- **Responsive layout** with TableLayoutPanel
-- **Icons and colors** on buttons for easy identification
-- **Terminal-style log** with black background and green text
-
-### Usability
-
-- **Validations** before executing operations
-- **Clear messages** for errors and success
-- **Non-blocking operations** with async/await
-- **Automatic saving** of configurations
-
-## 📋 Future Roadmap
-
-- [ ] Complete scheduling implementation
-- [ ] Automatic restore functionality  
-- [ ] Incremental backup
-- [ ] Backup compression
-- [ ] Cloud backup (OneDrive, Google Drive)
-- [ ] Email notifications
-- [ ] Dark/light theme
-
-This version represents a significant leap in functionality and usability compared to previous versions!
-
 ```text
 BackupPath/
 ├── Monday 22-07-2025-Backup/
@@ -183,14 +169,6 @@ BackupPath/
 │   └── FileBackup/
 │       └── [Plex Files]
 ```
-
-## Differences from PowerShell Version
-
-- Better error handling and exceptions
-- Object-oriented structure
-- Strong typing
-- Better performance
-- Easier to maintain and debug
 
 ## Configuration for Scheduled Task
 
