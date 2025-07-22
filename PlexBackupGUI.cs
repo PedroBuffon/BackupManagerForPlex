@@ -16,7 +16,7 @@ namespace PlexBackupApp
     /// Author: Pedro Buffon
     /// Purpose: Backs up Plex Database Files & Registry Keys
     /// Usage: GUI Application with advanced features
-    /// Version: 3.0 (GUI Version)
+    /// Version: 1.0 (GUI Version)
     /// Last Updated: 22/07/2025
     /// </summary>
     
@@ -99,7 +99,7 @@ namespace PlexBackupApp
 
         private void InitializeComponent()
         {
-            this.Text = "Plex Backup Manager v3.0";
+            this.Text = "Plex Backup Manager v1.0";
             this.Size = new Size(800, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -306,7 +306,7 @@ namespace PlexBackupApp
             this.Controls.Add(mainPanel);
 
             // Add welcome message to log
-            LogMessage("Plex Backup Manager v3.0 - Ready for operation", Color.White);
+            LogMessage("Plex Backup Manager v1.0 - Ready for operation", Color.White);
         }
 
         private void InitializeSystemTray()
