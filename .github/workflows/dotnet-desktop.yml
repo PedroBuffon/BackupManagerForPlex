@@ -2,10 +2,12 @@
 # This workflow builds and tests the Plex Backup Manager Windows Forms application
 # Built on .NET 9.0 with Windows Forms support
 
-name: Plex Backup Manager Build
+name: Create Plex Backup Manager Build Release
 
 on:
   push:
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
@@ -83,9 +85,9 @@ jobs:
       id: package
       run: |
         $version = "v$(Get-Date -Format 'yyyy.MM.dd.HHmm')"
-        Compress-Archive -Path "./release/*" -DestinationPath "PlexBackup-$version.zip"
+        Compress-Archive -Path "./release/*" -DestinationPath "PlexBackup.zip"
         echo "version=$version" >> $env:GITHUB_OUTPUT
-        echo "package_name=PlexBackup-$version.zip" >> $env:GITHUB_OUTPUT
+        echo "package_name=PlexBackup.zip" >> $env:GITHUB_OUTPUT
 
     - name: Create Release
       id: create_release
@@ -93,17 +95,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.package.outputs.version }}
-        name: Plex Backup Manager ${{ steps.package.outputs.version }}
+        tag_name: ${{ github.ref }}
+        name: Release ${{ github.ref }}
         body: |
-          ## Plex Backup Manager Release ${{ steps.package.outputs.version }}
-          
+
           ### Features:
-          - Windows Forms GUI application
-          - JSON configuration support
-          - System tray integration
-          - Automatic backup scheduling
-          - Registry and file backup support
+          - Added rollback functionality when backup fails
+          - Improved error handling and logging
           
           ### Installation:
           1. Download the ZIP file
