@@ -47,6 +47,7 @@ jobs:
 
   release:
     name: Create Release
+    needs: build
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: windows-latest
     permissions:
@@ -56,14 +57,14 @@ jobs:
     - name: '📄 Checkout'
       uses: actions/checkout@v4
 
-    - name: '� Debug Info'
+    - name: '🔍 Debug Info'
       run: |
         echo "Event: ${{ github.event_name }}"
         echo "Ref: ${{ github.ref }}"
         echo "Ref Name: ${{ github.ref_name }}"
         echo "Tag Check: ${{ startsWith(github.ref, 'refs/tags/') }}"
 
-    - name: '�🔧 Setup .NET'
+    - name: '🔧 Setup .NET'
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 9.0.x
@@ -135,7 +136,8 @@ jobs:
           1. Download the appropriate ZIP file for your system architecture
           2. Extract to your desired location
           3. Run `PlexBackup.exe`
-          4. Configure your backup settings
+          4. Configure your backup settings via the Settings button
+          5. Set your backup path and preferences
           
           ### ⚙️ System Requirements:
           - Windows 10/11 or Windows Server 2019+
@@ -145,7 +147,7 @@ jobs:
           ### 🆘 Support:
           - Check `README.md` for basic usage instructions
           - Check `ROLLBACK.md` for rollback feature documentation
-          - Report issues on GitHub
+          - Report issues on GitHub with detailed logs
         files: |
           PlexBackup-win-x64.zip
           PlexBackup-win-x86.zip
