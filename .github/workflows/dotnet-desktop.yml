@@ -7,7 +7,7 @@ name: Plex Backup Manager Build
 on:
   push:
     tags:
-      - 'v*' # Push events to matching v*, i.e. v1.0.0, v20.15.10
+      - 'v1.0.2'
     branches: ["main"]
   # pull_request:
   #   branches: ["main"]
