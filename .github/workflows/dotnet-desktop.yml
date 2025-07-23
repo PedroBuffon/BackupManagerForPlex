@@ -102,20 +102,33 @@ jobs:
         body: |
           
           ### 🆕 New Features:
-          - **Rollback System**: Automatic rollback when backup fails
-          - **Enhanced UI**: Improved settings and configuration options
-          - **System Tray**: Minimize to system tray functionality
-          - **JSON Configuration**: Modern configuration format
+          - **Enhanced Interface**: Reorganized settings window with improved organization
+          - **Comprehensive Logging**: Advanced log viewer with syntax highlighting and copy functionality
+          - **Performance Optimization**: Improved restore speed with robocopy multi-threading (8 threads)
+          - **Smart Restore**: Dynamic progress calculation and timeout management (15 minutes)
+          - **Native Windows Theme**: Consistent system-native styling across all windows
+          - **Rollback System**: Automatic rollback when backup fails with configurable retry attempts
+          - **System Tray Integration**: Complete minimize to system tray functionality
+          - **JSON Configuration**: Modern configuration format with automatic migration
           
-          ### 🔧 Improvements:
-          - Better error handling and logging
-          - Comprehensive backup validation
-          - Enhanced file and registry backup processes
-          - Automatic cleanup of old backups
+          ### 🔧 Major Improvements:
+          - **Simplified Main Interface**: Moved backup options to organized settings window
+          - **Enhanced Restore Experience**: Custom completion dialogs with detailed log access
+          - **Better Error Handling**: Comprehensive error reporting and recovery
+          - **Settings Organization**: Clear categorization of backup, interface, rollback, and logging options
+          - **Removed Duplications**: Eliminated redundant interface elements for cleaner UX
+          - **File Management**: Robust file and registry backup processes with validation
+          - **Automatic Cleanup**: Smart retention policies for managing old backups
+          
+          ### 🎨 Interface Updates:
+          - **Clean Main Window**: Focused on essential actions (Backup, Schedule, Manage, Settings)
+          - **Organized Settings**: Grouped by Backup Options, Interface Settings, Rollback Settings, and Logging
+          - **Professional Styling**: Windows native theme for better system integration
+          - **Accessibility**: Proper color contrast and system font support
           
           ### 📦 Available Packages:
           - **win-x64**: For 64-bit Windows systems (Recommended)
-          - **win-x86**: For 32-bit Windows systems
+          - **win-x86**: For 32-bit Windows systems  
           - **win-arm64**: For ARM64 Windows systems
           
           ### 📋 Installation:

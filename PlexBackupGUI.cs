@@ -31,7 +31,6 @@ namespace PlexBackupApp
         public int RetentionDays { get; set; } = 2; // Index for combobox (30 days default)
         public DateTime LastBackup { get; set; } = DateTime.MinValue;
         public int TotalBackupsCreated { get; set; } = 0;
-        public List<string> CustomPlexPaths { get; set; } = new List<string>();
         public bool MinimizeToTray { get; set; } = false;
         public bool ShowNotifications { get; set; } = true;
         public bool AutoStartWithWindows { get; set; } = false;
@@ -55,6 +54,210 @@ namespace PlexBackupApp
         public string TempRollbackPath { get; set; } = "";
     }
 
+    // Restore Complete Result Window
+    public partial class RestoreCompleteForm : Form
+    {
+        private readonly string restoreMessage;
+        private readonly string fullLogContent;
+        private readonly bool isSuccess;
+        
+        public RestoreCompleteForm(string message, string logContent, bool success)
+        {
+            restoreMessage = message;
+            fullLogContent = logContent;
+            isSuccess = success;
+            InitializeRestoreCompleteForm();
+        }
+        
+        private void InitializeRestoreCompleteForm()
+        {
+            // Form properties
+            Text = isSuccess ? "Restore Complete" : "Restore Failed";
+            Size = new Size(500, 300);
+            StartPosition = FormStartPosition.CenterParent;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            
+            // Apply consistent theme with main window (system default)
+            BackColor = SystemColors.Control;
+            ForeColor = SystemColors.ControlText;
+            
+            // Message label
+            var lblMessage = new Label
+            {
+                Text = restoreMessage,
+                Location = new Point(20, 20),
+                Size = new Size(440, 150),
+                Font = new Font("Segoe UI", 9F),
+                AutoSize = false,
+                ForeColor = SystemColors.ControlText,
+                BackColor = SystemColors.Control
+            };
+            
+            // Show Logs button
+            var btnShowLogs = new Button
+            {
+                Text = "Show Detailed Logs",
+                Location = new Point(20, 190),
+                Size = new Size(150, 30),
+                Font = new Font("Segoe UI", 9F),
+                UseVisualStyleBackColor = true
+            };
+            btnShowLogs.Click += BtnShowLogs_Click;
+            
+            // OK button
+            var btnOK = new Button
+            {
+                Text = "OK",
+                Location = new Point(390, 190),
+                Size = new Size(75, 30),
+                Font = new Font("Segoe UI", 9F),
+                DialogResult = DialogResult.OK,
+                UseVisualStyleBackColor = true
+            };
+            
+            // Add controls
+            Controls.AddRange(new Control[] { lblMessage, btnShowLogs, btnOK });
+            
+            // Set accept button
+            AcceptButton = btnOK;
+        }
+        
+        private void BtnShowLogs_Click(object sender, EventArgs e)
+        {
+            var logForm = new RestoreLogViewerForm(fullLogContent);
+            logForm.ShowDialog(this);
+        }
+    }
+    
+    // Restore Log Viewer Window
+    public partial class RestoreLogViewerForm : Form
+    {
+        public RestoreLogViewerForm(string logContent)
+        {
+            InitializeLogViewerForm(logContent);
+        }
+        
+        private void InitializeLogViewerForm(string logContent)
+        {
+            // Form properties
+            Text = "Restore Process Logs";
+            Size = new Size(800, 600);
+            StartPosition = FormStartPosition.CenterParent;
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MinimumSize = new Size(600, 400);
+            
+            // Apply consistent theme with main window (system default)
+            BackColor = SystemColors.Control;
+            ForeColor = SystemColors.ControlText;
+            
+            // Log text box
+            var txtLogs = new RichTextBox
+            {
+                Location = new Point(10, 10),
+                Size = new Size(760, 500),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+                ReadOnly = true,
+                Font = new Font("Consolas", 9F),
+                BackColor = SystemColors.Window,
+                ForeColor = SystemColors.WindowText,
+                Text = logContent,
+                WordWrap = true,
+                BorderStyle = BorderStyle.Fixed3D
+            };
+            
+            // Format the log content with colors
+            FormatLogContent(txtLogs);
+            
+            // Copy Logs button
+            var btnCopyLogs = new Button
+            {
+                Text = "Copy to Clipboard",
+                Location = new Point(10, 520),
+                Size = new Size(120, 30),
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
+                Font = new Font("Segoe UI", 9F),
+                UseVisualStyleBackColor = true
+            };
+            btnCopyLogs.Click += (s, e) => {
+                try
+                {
+                    Clipboard.SetText(logContent);
+                    MessageBox.Show("Logs copied to clipboard!", "Copy Complete", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch
+                {
+                    MessageBox.Show("Failed to copy logs to clipboard.", "Copy Failed", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            };
+            
+            // Close button
+            var btnClose = new Button
+            {
+                Text = "Close",
+                Location = new Point(695, 520),
+                Size = new Size(75, 30),
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+                Font = new Font("Segoe UI", 9F),
+                DialogResult = DialogResult.OK,
+                UseVisualStyleBackColor = true
+            };
+            
+            // Add controls
+            Controls.AddRange(new Control[] { txtLogs, btnCopyLogs, btnClose });
+            
+            // Set accept button
+            AcceptButton = btnClose;
+        }
+        
+        private void FormatLogContent(RichTextBox txtLogs)
+        {
+            string[] lines = txtLogs.Text.Split('\n');
+            txtLogs.Text = "";
+            
+            foreach (string line in lines)
+            {
+                if (line.Contains("ERROR") || line.Contains("FAILED"))
+                {
+                    txtLogs.SelectionColor = Color.FromArgb(192, 0, 0); // Dark red for light theme
+                }
+                else if (line.Contains("WARNING") || line.Contains("WARN"))
+                {
+                    txtLogs.SelectionColor = Color.FromArgb(255, 140, 0); // Dark orange for light theme
+                }
+                else if (line.Contains("SUCCESS") || line.Contains("COMPLETED"))
+                {
+                    txtLogs.SelectionColor = Color.FromArgb(0, 128, 0); // Dark green for light theme
+                }
+                else if (line.Contains("INFO") || line.Contains("PROGRESS"))
+                {
+                    txtLogs.SelectionColor = Color.FromArgb(0, 0, 192); // Dark blue for light theme
+                }
+                else if (line.Contains("STATUS") || line.Contains("OPERATION"))
+                {
+                    txtLogs.SelectionColor = Color.FromArgb(64, 64, 64); // Dark gray for status
+                }
+                else if (line.Contains("DEBUG"))
+                {
+                    txtLogs.SelectionColor = Color.FromArgb(128, 0, 128); // Dark magenta for debug
+                }
+                else
+                {
+                    txtLogs.SelectionColor = SystemColors.WindowText; // Default system text color
+                }
+                
+                txtLogs.AppendText(line + "\n");
+            }
+            
+            // Scroll to top
+            txtLogs.SelectionStart = 0;
+            txtLogs.ScrollToCaret();
+        }
+    }
+
     public partial class PlexBackupForm : Form
     {
         private PlexBackupConfig config;
@@ -72,12 +275,6 @@ namespace PlexBackupApp
         private Button btnBrowse;
         private Button btnBackupNow;
         private Button btnScheduleBackup;
-        private CheckBox chkIncludeRegistry;
-        private CheckBox chkIncludeFiles;
-        private CheckBox chkIncludeLogs;
-        private CheckBox chkStopPlex;
-        private CheckBox chkMinimizeToTray;
-        private CheckBox chkEnableRollback;
         private ComboBox cmbRetentionDays;
         private ProgressBar progressBar;
         private RichTextBox txtLog;
@@ -119,6 +316,10 @@ namespace PlexBackupApp
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.Icon = SystemIcons.Application;
+            
+            // Apply consistent theme - use system default (light theme)
+            this.BackColor = SystemColors.Control;
+            this.ForeColor = SystemColors.ControlText;
 
             // Main container
             var mainPanel = new TableLayoutPanel
@@ -168,45 +369,22 @@ namespace PlexBackupApp
             pathPanel.Controls.Add(txtBackupPath);
             pathPanel.Controls.Add(btnBrowse);
 
-            // Options Section
-            var lblOptions = new Label
-            {
-                Text = "Backup Options:",
-                AutoSize = true,
-                Anchor = AnchorStyles.Left,
-                Font = new Font("Arial", 10F, FontStyle.Bold)
-            };
-
-            var optionsPanel = new FlowLayoutPanel
-            {
-                FlowDirection = FlowDirection.TopDown,
-                Height = 165,
-                Dock = DockStyle.Fill
-            };
-
-            chkIncludeRegistry = new CheckBox { Text = "Include Registry Backup", Checked = true, AutoSize = true };
-            chkIncludeFiles = new CheckBox { Text = "Include File Backup", Checked = true, AutoSize = true };
-            chkIncludeLogs = new CheckBox { Text = "Include Previous Logs", Checked = false, AutoSize = true };
-            chkStopPlex = new CheckBox { Text = "Stop Plex During Backup", Checked = true, AutoSize = true };
-            chkMinimizeToTray = new CheckBox { Text = "Minimize to System Tray", Checked = false, AutoSize = true };
-            chkMinimizeToTray.CheckedChanged += ChkMinimizeToTray_CheckedChanged;
-            chkEnableRollback = new CheckBox { Text = "Enable Automatic Rollback on Failure", Checked = true, AutoSize = true };
-
-            optionsPanel.Controls.AddRange(new Control[] { chkIncludeRegistry, chkIncludeFiles, chkIncludeLogs, chkStopPlex, chkMinimizeToTray, chkEnableRollback });
-
             // Retention Section
             var lblRetention = new Label
             {
                 Text = "Keep Backups For:",
                 AutoSize = true,
                 Anchor = AnchorStyles.Left,
-                Font = new Font("Arial", 10F, FontStyle.Bold)
+                Font = new Font("Arial", 10F, FontStyle.Bold),
+                ForeColor = SystemColors.ControlText
             };
 
             cmbRetentionDays = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Width = 200
+                Width = 200,
+                BackColor = SystemColors.Window,
+                ForeColor = SystemColors.WindowText
             };
             cmbRetentionDays.Items.AddRange(new string[] { "7 days", "14 days", "30 days", "60 days", "Never delete" });
             cmbRetentionDays.SelectedIndex = 2; // 30 days default
@@ -294,12 +472,10 @@ namespace PlexBackupApp
             // Add controls to main panel
             mainPanel.Controls.Add(lblBackupPath, 0, 0);
             mainPanel.Controls.Add(pathPanel, 1, 0);
-            mainPanel.Controls.Add(lblOptions, 0, 1);
-            mainPanel.Controls.Add(optionsPanel, 1, 1);
-            mainPanel.Controls.Add(lblRetention, 0, 2);
-            mainPanel.Controls.Add(cmbRetentionDays, 1, 2);
-            mainPanel.Controls.Add(new Label { Text = "Actions:", AutoSize = true, Font = new Font("Arial", 10F, FontStyle.Bold) }, 0, 3);
-            mainPanel.Controls.Add(btnPanel, 1, 3);
+            mainPanel.Controls.Add(lblRetention, 0, 1);
+            mainPanel.Controls.Add(cmbRetentionDays, 1, 1);
+            mainPanel.Controls.Add(new Label { Text = "Actions:", AutoSize = true, Font = new Font("Arial", 10F, FontStyle.Bold), ForeColor = SystemColors.ControlText }, 0, 2);
+            mainPanel.Controls.Add(btnPanel, 1, 2);
             mainPanel.Controls.Add(progressBar, 0, 4);
             mainPanel.SetColumnSpan(progressBar, 2);
             mainPanel.Controls.Add(lblStatus, 0, 5);
@@ -410,30 +586,6 @@ namespace PlexBackupApp
             }
         }
 
-        private void ChkMinimizeToTray_CheckedChanged(object sender, EventArgs e)
-        {
-            config.MinimizeToTray = chkMinimizeToTray.Checked;
-            notifyIcon.Visible = config.MinimizeToTray;
-            SaveConfiguration();
-            
-            if (config.MinimizeToTray)
-            {
-                LogMessage("Minimize to tray enabled - close button will minimize instead of exit", Color.Yellow);
-                
-                // Show notification only if it's the first time this option is enabled
-                if (!config.HasShownTrayNotification && config.ShowNotifications)
-                {
-                    ShowTrayNotification("Plex Backup Manager will now minimize to system tray when closed", ToolTipIcon.Info);
-                    config.HasShownTrayNotification = true;
-                    SaveConfiguration();
-                }
-            }
-            else
-            {
-                LogMessage("Minimize to tray disabled - close button will exit application", Color.Yellow);
-            }
-        }
-
         private void BtnScheduleBackup_Click(object sender, EventArgs e)
         {
             var scheduleForm = new ScheduleBackupForm();
@@ -457,9 +609,15 @@ namespace PlexBackupApp
             var settingsForm = new AdvancedSettingsForm(config);
             if (settingsForm.ShowDialog() == DialogResult.OK)
             {
-                // Settings were changed, reload UI
+                // Settings were changed, reload UI and apply interface settings
                 LoadConfigurationToUI();
                 SaveConfiguration();
+                
+                // Apply minimize to tray configuration
+                notifyIcon.Visible = config.MinimizeToTray;
+                
+                // Log settings update
+                LogMessage("Settings updated successfully", Color.LightGreen);
             }
         }
 
@@ -614,27 +772,27 @@ namespace PlexBackupApp
                 }
 
                 // Perform backups based on selected options
-                if (chkStopPlex.Checked)
+                if (config.StopPlex)
                 {
                     LogMessage("Stopping Plex Media Server...", Color.Yellow);
                     StopPlexServer();
                 }
 
-                if (chkIncludeRegistry.Checked)
+                if (config.IncludeRegistry)
                 {
                     LogMessage("Backing up registry...", Color.Cyan);
                     BackupRegistry(weekdayDestination, weekday);
                     rollbackState.RegistryBackupCompleted = true;
                 }
 
-                if (chkIncludeFiles.Checked)
+                if (config.IncludeFiles)
                 {
                     LogMessage("Backing up files...", Color.Cyan);
                     BackupFiles(weekdayDestination, logDestination, weekday);
                     rollbackState.FileBackupCompleted = true;
                 }
 
-                if (chkStopPlex.Checked)
+                if (config.StopPlex)
                 {
                     LogMessage("Restarting Plex Media Server...", Color.Yellow);
                     StartPlexServer();
@@ -1075,13 +1233,6 @@ namespace PlexBackupApp
             txtBackupPath.Text = config.BackupPath;
             rootBackup = config.BackupPath;
             
-            chkIncludeRegistry.Checked = config.IncludeRegistry;
-            chkIncludeFiles.Checked = config.IncludeFiles;
-            chkIncludeLogs.Checked = config.IncludeLogs;
-            chkStopPlex.Checked = config.StopPlex;
-            chkMinimizeToTray.Checked = config.MinimizeToTray;
-            chkEnableRollback.Checked = config.EnableRollback;
-            
             if (config.RetentionDays >= 0 && config.RetentionDays < cmbRetentionDays.Items.Count)
                 cmbRetentionDays.SelectedIndex = config.RetentionDays;
 
@@ -1105,12 +1256,6 @@ namespace PlexBackupApp
             {
                 // Update config from UI
                 config.BackupPath = txtBackupPath.Text;
-                config.IncludeRegistry = chkIncludeRegistry.Checked;
-                config.IncludeFiles = chkIncludeFiles.Checked;
-                config.IncludeLogs = chkIncludeLogs.Checked;
-                config.StopPlex = chkStopPlex.Checked;
-                config.MinimizeToTray = chkMinimizeToTray.Checked;
-                config.EnableRollback = chkEnableRollback.Checked;
                 config.RetentionDays = cmbRetentionDays.SelectedIndex;
 
                 // Save as JSON
@@ -1526,16 +1671,39 @@ namespace PlexBackupApp
                         }
                     });
                     
+                    // Capture logs before closing the progress form
+                    var progressFormLogs = progressForm.GetAllLogs();
                     progressForm.Close();
                     
                     var successMessage = "Backup restored successfully!\n\n" +
                                        $"Restore Log:\n{restoreLogger.GetSummary()}\n\n" +
                                        $"Safety backup created at:\n{safetyBackupPath}";
                     
-                    MessageBox.Show(successMessage, "Restore Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    // Combine logs from both RestoreLogger and RestoreProgressForm
+                    var restoreLoggerContent = restoreLogger.GetFullLog();
+                    
+                    // Debug: Add information about log content
+                    var debugInfo = $"=== LOG CONTENT DEBUG ===\n" +
+                                   $"RestoreLogger Content Length: {restoreLoggerContent?.Length ?? 0} characters\n" +
+                                   $"ProgressForm Logs Length: {progressFormLogs?.Length ?? 0} characters\n" +
+                                   $"ProgressForm Logs Empty: {string.IsNullOrWhiteSpace(progressFormLogs)}\n\n";
+                    
+                    var combinedLogs = debugInfo +
+                                      "=== RESTORE LOGGER DETAILS ===\n\n" +
+                                      (string.IsNullOrEmpty(restoreLoggerContent) ? "No RestoreLogger content available.\n" : restoreLoggerContent) + 
+                                      "\n\n=== DETAILED PROGRESS LOGS ===\n\n" +
+                                      (string.IsNullOrEmpty(progressFormLogs) ? "No progress logs available.\n" : progressFormLogs);
+                    
+                    // Show custom restore complete form with comprehensive log viewer button
+                    using (var restoreCompleteForm = new RestoreCompleteForm(successMessage, combinedLogs, true))
+                    {
+                        restoreCompleteForm.ShowDialog(this);
+                    }
                 }
                 catch (Exception ex)
                 {
+                    // Capture logs before closing the progress form
+                    var progressErrorLogs = progressForm.GetAllLogs();
                     progressForm.Close();
                     
                     var errorMessage = $"Restore operation failed: {ex.Message}\n\n" +
@@ -1571,7 +1739,26 @@ namespace PlexBackupApp
                     }
                     else
                     {
-                        MessageBox.Show(errorMessage, "Restore Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        // Combine logs from both RestoreLogger and RestoreProgressForm for error case
+                        var restoreLoggerErrorContent = restoreLogger.GetFullLog();
+                        
+                        // Debug: Add information about log content for error case
+                        var debugErrorInfo = $"=== ERROR LOG CONTENT DEBUG ===\n" +
+                                           $"RestoreLogger Error Content Length: {restoreLoggerErrorContent?.Length ?? 0} characters\n" +
+                                           $"ProgressForm Error Logs Length: {progressErrorLogs?.Length ?? 0} characters\n" +
+                                           $"ProgressForm Error Logs Empty: {string.IsNullOrWhiteSpace(progressErrorLogs)}\n\n";
+                        
+                        var combinedErrorLogs = debugErrorInfo +
+                                              "=== RESTORE LOGGER DETAILS ===\n\n" +
+                                              (string.IsNullOrEmpty(restoreLoggerErrorContent) ? "No RestoreLogger error content available.\n" : restoreLoggerErrorContent) +
+                                              "\n\n=== DETAILED PROGRESS LOGS ===\n\n" +
+                                              (string.IsNullOrEmpty(progressErrorLogs) ? "No progress error logs available.\n" : progressErrorLogs);
+                        
+                        // Show custom restore error form with comprehensive log viewer button
+                        using (var restoreErrorForm = new RestoreCompleteForm(errorMessage, combinedErrorLogs, false))
+                        {
+                            restoreErrorForm.ShowDialog(this);
+                        }
                     }
                 }
                 finally
@@ -1707,15 +1894,45 @@ namespace PlexBackupApp
                     progressForm?.LogInfo("Existing Plex data cleared successfully");
 
                     progressForm?.UpdateStatus("Restoring files from backup...");
-                    progressForm?.UpdateOperation("Copying database and configuration files - this may take several minutes");
+                    progressForm?.UpdateOperation("Analyzing backup data for optimal restore method...");
                     progressForm?.UpdateProgress(50);
+
+                    // Analyze backup size to choose optimal method
+                    long backupSizeBytes = 0;
+                    int fileCount = 0;
+                    try
+                    {
+                        var backupDir = new DirectoryInfo(fileBackupPath);
+                        var files = backupDir.GetFiles("*", SearchOption.AllDirectories);
+                        fileCount = files.Length;
+                        backupSizeBytes = files.Sum(f => f.Length);
+                        
+                        var backupSizeMB = backupSizeBytes / (1024 * 1024);
+                        progressForm?.LogInfo($"Backup analysis: {fileCount} files, {backupSizeMB} MB total");
+                        
+                        // Choose method based on size and file count
+                        if (backupSizeMB > 500 || fileCount > 5000)
+                        {
+                            progressForm?.LogInfo("Large backup detected - using high-performance robocopy method");
+                            progressForm?.UpdateOperation("Large backup detected - using optimized robocopy method");
+                        }
+                        else
+                        {
+                            progressForm?.LogInfo("Small/medium backup detected - robocopy method selected");
+                            progressForm?.UpdateOperation("Medium-sized backup - using robocopy method");
+                        }
+                    }
+                    catch
+                    {
+                        progressForm?.LogWarning("Could not analyze backup size - using robocopy as default");
+                    }
 
                     // Try robocopy first with timeout, fallback to manual copy if needed
                     bool robocopySuccess = false;
                     
                     try
                     {
-                        progressForm?.LogInfo("Attempting file restore using robocopy...");
+                        progressForm?.LogInfo("Attempting file restore using optimized robocopy...");
                         robocopySuccess = RestoreFilesWithRobocopy(fileBackupPath, destination, progressForm, logger);
                     }
                     catch (Exception robocopyEx)
@@ -1789,20 +2006,35 @@ namespace PlexBackupApp
 
         private bool RestoreFilesWithRobocopy(string source, string destination, RestoreProgressForm progressForm, RestoreLogger logger)
         {
-            const int timeoutMinutes = 10; // Maximum 10 minutes for robocopy
+            const int timeoutMinutes = 15; // Increased timeout for better performance
             
             try
             {
-                progressForm?.UpdateOperation("Starting robocopy process...");
+                progressForm?.UpdateOperation("Starting high-performance robocopy process...");
                 progressForm?.LogInfo($"Starting robocopy: {source} -> {destination}");
                 progressForm?.LogInfo($"Robocopy timeout set to {timeoutMinutes} minutes");
+                
+                // Get source size for better progress estimation
+                long totalBytes = 0;
+                try
+                {
+                    var sourceDir = new DirectoryInfo(source);
+                    var files = sourceDir.GetFiles("*", SearchOption.AllDirectories);
+                    totalBytes = files.Sum(f => f.Length);
+                    progressForm?.LogInfo($"Source data size: {totalBytes / (1024 * 1024)} MB");
+                }
+                catch
+                {
+                    // If we can't get size, use time-based progress
+                    progressForm?.LogInfo("Using time-based progress estimation");
+                }
                 
                 var robocopyProcess = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = "robocopy",
-                        Arguments = $"\"{source}\" \"{destination}\" /MIR /R:3 /W:1 /MT:2 /NP",
+                        Arguments = $"\"{source}\" \"{destination}\" /MIR /R:1 /W:1 /MT:8 /NFL /NDL /NP /NC /NS /NJH",
                         UseShellExecute = false,
                         CreateNoWindow = true,
                         RedirectStandardOutput = true,
@@ -1811,21 +2043,47 @@ namespace PlexBackupApp
                 };
 
                 robocopyProcess.Start();
-                progressForm?.LogInfo("Robocopy process started");
+                progressForm?.LogInfo("High-performance robocopy process started (8 threads, minimal logging)");
                 
-                // Wait with timeout and progress updates
+                // Wait with timeout and dynamic progress updates
                 var startTime = DateTime.Now;
                 var timeoutTime = startTime.AddMinutes(timeoutMinutes);
+                var lastProgressTime = startTime;
+                var progressBaseValue = 50;
+                var progressRange = 30; // 50% to 80%
                 
                 while (!robocopyProcess.HasExited && DateTime.Now < timeoutTime)
                 {
                     var elapsed = DateTime.Now - startTime;
-                    var progressPercentage = Math.Min(50 + (int)(elapsed.TotalMinutes / timeoutMinutes * 30), 80);
+                    var timeSinceLastUpdate = DateTime.Now - lastProgressTime;
                     
-                    progressForm?.UpdateProgress(progressPercentage);
-                    progressForm?.UpdateOperation($"Copying files... ({elapsed.Minutes}m {elapsed.Seconds}s elapsed)");
+                    // Dynamic progress calculation based on elapsed time with acceleration curve
+                    var elapsedRatio = elapsed.TotalMinutes / timeoutMinutes;
+                    var acceleratedProgress = Math.Pow(elapsedRatio, 0.7); // Slower start, faster middle
+                    var progressPercentage = Math.Min(progressBaseValue + (int)(acceleratedProgress * progressRange), 80);
                     
-                    System.Threading.Thread.Sleep(2000); // Update every 2 seconds
+                    // Update every 5 seconds instead of 2 for better performance
+                    if (timeSinceLastUpdate.TotalSeconds >= 5)
+                    {
+                        progressForm?.UpdateProgress(progressPercentage);
+                        
+                        // Calculate estimated time remaining
+                        var estimatedTotalTime = elapsed.TotalMinutes / Math.Max(acceleratedProgress, 0.01);
+                        var estimatedRemaining = Math.Max(0, estimatedTotalTime - elapsed.TotalMinutes);
+                        
+                        if (estimatedRemaining > 1)
+                        {
+                            progressForm?.UpdateOperation($"Copying files... ({elapsed.Minutes}m {elapsed.Seconds}s elapsed, ~{(int)estimatedRemaining}m remaining)");
+                        }
+                        else
+                        {
+                            progressForm?.UpdateOperation($"Copying files... ({elapsed.Minutes}m {elapsed.Seconds}s elapsed, finishing up...)");
+                        }
+                        
+                        lastProgressTime = DateTime.Now;
+                    }
+                    
+                    System.Threading.Thread.Sleep(1000); // Check every second but update UI less frequently
                 }
                 
                 if (!robocopyProcess.HasExited)
@@ -1846,6 +2104,7 @@ namespace PlexBackupApp
                 // Check the exit code
                 var exitCode = robocopyProcess.ExitCode;
                 progressForm?.LogInfo($"Robocopy completed with exit code: {exitCode}");
+                progressForm?.LogInfo("Robocopy operation finished successfully");
                 
                 if (exitCode > 7)
                 {
@@ -1874,26 +2133,34 @@ namespace PlexBackupApp
         {
             try
             {
-                progressForm?.UpdateOperation("Calculating files to copy...");
-                progressForm?.LogInfo("Starting manual file copy process");
+                progressForm?.UpdateOperation("Analyzing source data for fast copy...");
+                progressForm?.LogInfo("Starting optimized manual file copy process");
                 
-                // Get all files to copy
+                // Get all files to copy with size information
                 var sourceDir = new DirectoryInfo(source);
                 var allFiles = sourceDir.GetFiles("*", SearchOption.AllDirectories).ToList();
                 var totalFiles = allFiles.Count;
+                var totalBytes = allFiles.Sum(f => f.Length);
                 var copiedFiles = 0;
+                var copiedBytes = 0L;
                 
-                logger?.LogInfo($"Found {totalFiles} files to copy");
-                progressForm?.LogInfo($"Found {totalFiles} files to copy manually");
+                logger?.LogInfo($"Found {totalFiles} files ({totalBytes / (1024 * 1024)} MB) to copy");
+                progressForm?.LogInfo($"Found {totalFiles} files ({totalBytes / (1024 * 1024)} MB) to copy manually");
                 
                 // Create directory structure first
                 progressForm?.UpdateOperation("Creating directory structure...");
                 progressForm?.LogInfo("Creating directory structure...");
                 CreateDirectoryStructure(source, destination);
                 
-                // Copy files with progress
-                progressForm?.LogInfo("Starting file copy process...");
-                foreach (var file in allFiles)
+                // Sort files by size (copy small files first for quick initial progress)
+                var sortedFiles = allFiles.OrderBy(f => f.Length).ToList();
+                
+                // Copy files with optimized progress tracking
+                progressForm?.LogInfo("Starting optimized file copy process...");
+                var startTime = DateTime.Now;
+                var lastUpdateTime = startTime;
+                
+                foreach (var file in sortedFiles)
                 {
                     try
                     {
@@ -1908,23 +2175,53 @@ namespace PlexBackupApp
                         
                         File.Copy(file.FullName, destFile, true);
                         copiedFiles++;
+                        copiedBytes += file.Length;
                         
-                        // Update progress every 10 files or if it's a large file
-                        if (copiedFiles % 10 == 0 || file.Length > 1024 * 1024) // Every 10 files or if file > 1MB
+                        var now = DateTime.Now;
+                        var timeSinceUpdate = now - lastUpdateTime;
+                        
+                        // Update progress more intelligently - based on bytes and time
+                        if (timeSinceUpdate.TotalSeconds >= 3 || file.Length > 5 * 1024 * 1024) // Every 3 seconds or large files
                         {
-                            var progressPercentage = 50 + (int)((double)copiedFiles / totalFiles * 30);
+                            var fileProgressPercentage = (double)copiedFiles / totalFiles;
+                            var byteProgressPercentage = totalBytes > 0 ? (double)copiedBytes / totalBytes : 0;
+                            
+                            // Use the average of file count and byte progress for more accurate estimation
+                            var combinedProgress = (fileProgressPercentage + byteProgressPercentage) / 2;
+                            var progressPercentage = 50 + (int)(combinedProgress * 30);
+                            
                             progressForm?.UpdateProgress(progressPercentage);
-                            progressForm?.UpdateOperation($"Copying files... {copiedFiles}/{totalFiles} ({file.Name})");
+                            
+                            // Calculate speed and ETA
+                            var elapsed = now - startTime;
+                            var copySpeed = elapsed.TotalSeconds > 0 ? copiedBytes / elapsed.TotalSeconds : 0;
+                            var remainingBytes = totalBytes - copiedBytes;
+                            var etaSeconds = copySpeed > 0 ? remainingBytes / copySpeed : 0;
+                            
+                            if (etaSeconds > 60)
+                            {
+                                progressForm?.UpdateOperation($"Copying files... {copiedFiles}/{totalFiles} (~{(int)(etaSeconds / 60)}m remaining)");
+                            }
+                            else if (etaSeconds > 0)
+                            {
+                                progressForm?.UpdateOperation($"Copying files... {copiedFiles}/{totalFiles} (~{(int)etaSeconds}s remaining)");
+                            }
+                            else
+                            {
+                                progressForm?.UpdateOperation($"Copying files... {copiedFiles}/{totalFiles} (finishing up...)");
+                            }
+                            
+                            lastUpdateTime = now;
                         }
                         
-                        // Log large files or milestones
+                        // Log progress for large files or milestones
                         if (file.Length > 10 * 1024 * 1024) // Files > 10MB
                         {
                             progressForm?.LogInfo($"Copied large file: {file.Name} ({file.Length / (1024 * 1024)} MB)");
                         }
-                        else if (copiedFiles % 100 == 0) // Every 100 files
+                        else if (copiedFiles % 500 == 0) // Every 500 files instead of 100
                         {
-                            progressForm?.LogInfo($"Progress: {copiedFiles}/{totalFiles} files copied");
+                            progressForm?.LogInfo($"Progress: {copiedFiles}/{totalFiles} files copied ({copiedBytes / (1024 * 1024)} MB)");
                         }
                     }
                     catch (Exception ex)
@@ -1935,8 +2232,11 @@ namespace PlexBackupApp
                     }
                 }
                 
-                logger?.LogInfo($"Manual copy completed: {copiedFiles}/{totalFiles} files copied");
-                progressForm?.LogInfo($"Manual copy completed: {copiedFiles}/{totalFiles} files copied");
+                var totalElapsed = DateTime.Now - startTime;
+                var avgSpeed = totalElapsed.TotalSeconds > 0 ? (copiedBytes / (1024 * 1024)) / totalElapsed.TotalSeconds : 0;
+                
+                logger?.LogInfo($"Manual copy completed: {copiedFiles}/{totalFiles} files copied in {totalElapsed.Minutes}m {totalElapsed.Seconds}s (avg: {avgSpeed:F1} MB/s)");
+                progressForm?.LogInfo($"Manual copy completed: {copiedFiles}/{totalFiles} files ({copiedBytes / (1024 * 1024)} MB) in {totalElapsed.Minutes}m {totalElapsed.Seconds}s");
                 
                 if (copiedFiles == 0)
                 {
@@ -2569,15 +2869,24 @@ namespace PlexBackupApp
     public class AdvancedSettingsForm : Form
     {
         private PlexBackupConfig config;
+        
+        // Backup Options
+        private CheckBox chkIncludeRegistry;
+        private CheckBox chkIncludeFiles;
+        private CheckBox chkIncludeLogs;
+        private CheckBox chkStopPlex;
+        
+        // UI Settings
         private CheckBox chkMinimizeToTray;
         private CheckBox chkShowNotifications;
         private CheckBox chkAutoStartWithWindows;
+        
+        // Rollback Settings
         private CheckBox chkEnableRollback;
         private NumericUpDown nudMaxRollbackAttempts;
+        
+        // Advanced Settings
         private ComboBox cmbLogLevel;
-        private ListBox lstCustomPlexPaths;
-        private Button btnAddPath;
-        private Button btnRemovePath;
         private Button btnOK;
         private Button btnCancel;
 
@@ -2590,152 +2899,148 @@ namespace PlexBackupApp
 
         private void InitializeAdvancedSettings()
         {
-            this.Text = "Advanced Settings";
-            this.Size = new Size(500, 400);
+            this.Text = "Settings";
+            this.Size = new Size(500, 420);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
+            this.BackColor = SystemColors.Control;
 
             var mainPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 10,
-                Padding = new Padding(10)
+                RowCount = 12,
+                Padding = new Padding(15),
+                BackColor = SystemColors.Control
             };
 
+            // Backup Options Section
+            var lblBackupOptions = new Label { Text = "Backup Options:", Font = new Font("Arial", 10F, FontStyle.Bold), AutoSize = true, ForeColor = SystemColors.ControlText };
+            chkIncludeRegistry = new CheckBox { Text = "Include Registry Backup", AutoSize = true, UseVisualStyleBackColor = true, ForeColor = SystemColors.ControlText };
+            chkIncludeFiles = new CheckBox { Text = "Include File Backup", AutoSize = true, UseVisualStyleBackColor = true, ForeColor = SystemColors.ControlText };
+            chkIncludeLogs = new CheckBox { Text = "Include Previous Logs", AutoSize = true, UseVisualStyleBackColor = true, ForeColor = SystemColors.ControlText };
+            chkStopPlex = new CheckBox { Text = "Stop Plex During Backup", AutoSize = true, UseVisualStyleBackColor = true, ForeColor = SystemColors.ControlText };
+
             // UI Settings
-            var lblUISettings = new Label { Text = "UI Settings:", Font = new Font("Arial", 10F, FontStyle.Bold), AutoSize = true };
-            chkMinimizeToTray = new CheckBox { Text = "Minimize to system tray", AutoSize = true };
-            chkShowNotifications = new CheckBox { Text = "Show backup notifications", AutoSize = true };
-            chkAutoStartWithWindows = new CheckBox { Text = "Auto start with Windows", AutoSize = true };
+            var lblUISettings = new Label { Text = "Interface Settings:", Font = new Font("Arial", 10F, FontStyle.Bold), AutoSize = true, ForeColor = SystemColors.ControlText };
+            chkMinimizeToTray = new CheckBox { Text = "Minimize to system tray", AutoSize = true, UseVisualStyleBackColor = true, ForeColor = SystemColors.ControlText };
+            chkShowNotifications = new CheckBox { Text = "Show backup notifications", AutoSize = true, UseVisualStyleBackColor = true, ForeColor = SystemColors.ControlText };
+            chkAutoStartWithWindows = new CheckBox { Text = "Auto start with Windows", AutoSize = true, UseVisualStyleBackColor = true, ForeColor = SystemColors.ControlText };
 
             // Rollback Settings
-            var lblRollbackSettings = new Label { Text = "Rollback Settings:", Font = new Font("Arial", 10F, FontStyle.Bold), AutoSize = true };
-            chkEnableRollback = new CheckBox { Text = "Enable automatic rollback on backup failure", AutoSize = true };
+            var lblRollbackSettings = new Label { Text = "Rollback Settings:", Font = new Font("Arial", 10F, FontStyle.Bold), AutoSize = true, ForeColor = SystemColors.ControlText };
+            chkEnableRollback = new CheckBox { Text = "Enable automatic rollback on backup failure", AutoSize = true, UseVisualStyleBackColor = true, ForeColor = SystemColors.ControlText };
             
-            var lblMaxAttempts = new Label { Text = "Max Rollback Attempts:", AutoSize = true };
+            var lblMaxAttempts = new Label { Text = "Max Rollback Attempts:", AutoSize = true, ForeColor = SystemColors.ControlText };
             nudMaxRollbackAttempts = new NumericUpDown 
             { 
                 Minimum = 1, 
                 Maximum = 10, 
                 Value = 3, 
-                Width = 60 
+                Width = 60,
+                BackColor = SystemColors.Window,
+                ForeColor = SystemColors.WindowText
             };
 
             // Log Level
-            var lblLogLevel = new Label { Text = "Log Level:", Font = new Font("Arial", 10F, FontStyle.Bold), AutoSize = true };
-            cmbLogLevel = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150 };
+            var lblLogLevel = new Label { Text = "Logging Settings:", Font = new Font("Arial", 10F, FontStyle.Bold), AutoSize = true, ForeColor = SystemColors.ControlText };
+            var lblLogLevelSub = new Label { Text = "Log Level:", AutoSize = true, ForeColor = SystemColors.ControlText };
+            cmbLogLevel = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150, BackColor = SystemColors.Window, ForeColor = SystemColors.WindowText };
             cmbLogLevel.Items.AddRange(new string[] { "Debug", "Info", "Warning", "Error" });
 
-            // Custom Plex Paths
-            var lblCustomPaths = new Label { Text = "Custom Plex Paths:", Font = new Font("Arial", 10F, FontStyle.Bold), AutoSize = true };
-            lstCustomPlexPaths = new ListBox { Height = 100, Width = 350 };
-            
-            var pathButtonPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, Height = 30 };
-            btnAddPath = new Button { Text = "Add Path", Width = 80, Height = 25 };
-            btnRemovePath = new Button { Text = "Remove", Width = 80, Height = 25 };
-            btnAddPath.Click += BtnAddPath_Click;
-            btnRemovePath.Click += BtnRemovePath_Click;
-            pathButtonPanel.Controls.AddRange(new Control[] { btnAddPath, btnRemovePath });
-
             // Action buttons
-            var buttonPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Height = 40, Dock = DockStyle.Bottom };
-            btnOK = new Button { Text = "OK", Width = 75, Height = 30, DialogResult = DialogResult.OK };
-            btnCancel = new Button { Text = "Cancel", Width = 75, Height = 30, DialogResult = DialogResult.Cancel };
+            var buttonPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Height = 40, Dock = DockStyle.Bottom, BackColor = SystemColors.Control };
+            btnOK = new Button { Text = "OK", Width = 75, Height = 30, DialogResult = DialogResult.OK, UseVisualStyleBackColor = true, ForeColor = SystemColors.ControlText };
+            btnCancel = new Button { Text = "Cancel", Width = 75, Height = 30, DialogResult = DialogResult.Cancel, UseVisualStyleBackColor = true, ForeColor = SystemColors.ControlText };
             btnOK.Click += BtnOK_Click;
             buttonPanel.Controls.AddRange(new Control[] { btnCancel, btnOK });
 
-            // Add controls to main panel
-            mainPanel.Controls.Add(lblUISettings, 0, 0);
+            // Add controls to main panel in organized sections
+            int row = 0;
+            
+            // Backup Options Section
+            mainPanel.Controls.Add(lblBackupOptions, 0, row++);
+            mainPanel.SetColumnSpan(lblBackupOptions, 2);
+            mainPanel.Controls.Add(chkIncludeRegistry, 0, row++);
+            mainPanel.SetColumnSpan(chkIncludeRegistry, 2);
+            mainPanel.Controls.Add(chkIncludeFiles, 0, row++);
+            mainPanel.SetColumnSpan(chkIncludeFiles, 2);
+            mainPanel.Controls.Add(chkIncludeLogs, 0, row++);
+            mainPanel.SetColumnSpan(chkIncludeLogs, 2);
+            mainPanel.Controls.Add(chkStopPlex, 0, row++);
+            mainPanel.SetColumnSpan(chkStopPlex, 2);
+            
+            // UI Settings Section
+            mainPanel.Controls.Add(lblUISettings, 0, row++);
             mainPanel.SetColumnSpan(lblUISettings, 2);
-            mainPanel.Controls.Add(chkMinimizeToTray, 0, 1);
+            mainPanel.Controls.Add(chkMinimizeToTray, 0, row++);
             mainPanel.SetColumnSpan(chkMinimizeToTray, 2);
-            mainPanel.Controls.Add(chkShowNotifications, 0, 2);
+            mainPanel.Controls.Add(chkShowNotifications, 0, row++);
             mainPanel.SetColumnSpan(chkShowNotifications, 2);
-            mainPanel.Controls.Add(chkAutoStartWithWindows, 0, 3);
+            mainPanel.Controls.Add(chkAutoStartWithWindows, 0, row++);
             mainPanel.SetColumnSpan(chkAutoStartWithWindows, 2);
             
-            mainPanel.Controls.Add(lblRollbackSettings, 0, 4);
+            // Rollback Settings Section
+            mainPanel.Controls.Add(lblRollbackSettings, 0, row++);
             mainPanel.SetColumnSpan(lblRollbackSettings, 2);
-            mainPanel.Controls.Add(chkEnableRollback, 0, 5);
+            mainPanel.Controls.Add(chkEnableRollback, 0, row++);
             mainPanel.SetColumnSpan(chkEnableRollback, 2);
-            mainPanel.Controls.Add(lblMaxAttempts, 0, 6);
-            mainPanel.Controls.Add(nudMaxRollbackAttempts, 1, 6);
+            mainPanel.Controls.Add(lblMaxAttempts, 0, row);
+            mainPanel.Controls.Add(nudMaxRollbackAttempts, 1, row++);
             
-            mainPanel.Controls.Add(lblLogLevel, 0, 7);
-            mainPanel.Controls.Add(cmbLogLevel, 1, 7);
-            mainPanel.Controls.Add(lblCustomPaths, 0, 8);
-            mainPanel.SetColumnSpan(lblCustomPaths, 2);
-            mainPanel.Controls.Add(lstCustomPlexPaths, 0, 9);
-            mainPanel.SetColumnSpan(lstCustomPlexPaths, 2);
-            mainPanel.Controls.Add(pathButtonPanel, 0, 10);
-            mainPanel.SetColumnSpan(pathButtonPanel, 2);
-
+            // Logging Settings Section
+            mainPanel.Controls.Add(lblLogLevel, 0, row++);
+            mainPanel.SetColumnSpan(lblLogLevel, 2);
+            mainPanel.Controls.Add(lblLogLevelSub, 0, row);
+            mainPanel.Controls.Add(cmbLogLevel, 1, row++);
+            
             this.Controls.Add(mainPanel);
             this.Controls.Add(buttonPanel);
         }
 
         private void LoadAdvancedSettings()
         {
+            // Load backup options
+            chkIncludeRegistry.Checked = config.IncludeRegistry;
+            chkIncludeFiles.Checked = config.IncludeFiles;
+            chkIncludeLogs.Checked = config.IncludeLogs;
+            chkStopPlex.Checked = config.StopPlex;
+            
+            // Load UI settings
             chkMinimizeToTray.Checked = config.MinimizeToTray;
             chkShowNotifications.Checked = config.ShowNotifications;
             chkAutoStartWithWindows.Checked = config.AutoStartWithWindows;
+            
+            // Load rollback settings
             chkEnableRollback.Checked = config.EnableRollback;
             nudMaxRollbackAttempts.Value = config.MaxRollbackAttempts;
             
+            // Load logging settings
             var logLevelIndex = new string[] { "Debug", "Info", "Warning", "Error" }.ToList().IndexOf(config.LogLevel);
             cmbLogLevel.SelectedIndex = logLevelIndex >= 0 ? logLevelIndex : 1; // Default to Info
-
-            lstCustomPlexPaths.Items.Clear();
-            foreach (var path in config.CustomPlexPaths)
-            {
-                lstCustomPlexPaths.Items.Add(path);
-            }
-        }
-
-        private void BtnAddPath_Click(object sender, EventArgs e)
-        {
-            using (var openFileDialog = new OpenFileDialog())
-            {
-                openFileDialog.Title = "Select Plex Media Server Executable";
-                openFileDialog.Filter = "Executable files (*.exe)|*.exe|All files (*.*)|*.*";
-                openFileDialog.FileName = "Plex Media Server.exe";
-
-                if (openFileDialog.ShowDialog() == DialogResult.OK)
-                {
-                    if (!lstCustomPlexPaths.Items.Contains(openFileDialog.FileName))
-                    {
-                        lstCustomPlexPaths.Items.Add(openFileDialog.FileName);
-                    }
-                }
-            }
-        }
-
-        private void BtnRemovePath_Click(object sender, EventArgs e)
-        {
-            if (lstCustomPlexPaths.SelectedIndex >= 0)
-            {
-                lstCustomPlexPaths.Items.RemoveAt(lstCustomPlexPaths.SelectedIndex);
-            }
         }
 
         private void BtnOK_Click(object sender, EventArgs e)
         {
-            // Save settings back to config
+            // Save backup options back to config
+            config.IncludeRegistry = chkIncludeRegistry.Checked;
+            config.IncludeFiles = chkIncludeFiles.Checked;
+            config.IncludeLogs = chkIncludeLogs.Checked;
+            config.StopPlex = chkStopPlex.Checked;
+            
+            // Save UI settings back to config
             config.MinimizeToTray = chkMinimizeToTray.Checked;
             config.ShowNotifications = chkShowNotifications.Checked;
             config.AutoStartWithWindows = chkAutoStartWithWindows.Checked;
+            
+            // Save rollback settings back to config
             config.EnableRollback = chkEnableRollback.Checked;
             config.MaxRollbackAttempts = (int)nudMaxRollbackAttempts.Value;
-            config.LogLevel = cmbLogLevel.SelectedItem?.ToString() ?? "Info";
             
-            config.CustomPlexPaths.Clear();
-            foreach (var item in lstCustomPlexPaths.Items)
-            {
-                config.CustomPlexPaths.Add(item.ToString());
-            }
+            // Save logging settings back to config
+            config.LogLevel = cmbLogLevel.SelectedItem?.ToString() ?? "Info";
         }
     }
 
@@ -2956,6 +3261,16 @@ namespace PlexBackupApp
             progressBar.Value = Math.Min(percentage, 100);
             LogMessage($"PROGRESS: {percentage}%", Color.Cyan);
             this.Refresh();
+        }
+
+        public string GetAllLogs()
+        {
+            if (this.InvokeRequired)
+            {
+                return (string)this.Invoke(new Func<string>(GetAllLogs));
+            }
+            
+            return txtLog.Text;
         }
     }
 }
