@@ -8,12 +8,11 @@ A modern and complete Windows Forms application for backing up Plex Media Server
 
 ## 📋 Future Roadmap
 
-- [ ] Complete scheduling implementation
-- [ ] Automatic restore functionality  
-- [ ] Incremental backup
+- [ ] Restore functionality
 - [ ] Backup compression
+- [ ] Complete scheduling implementation
+- [ ] Incremental backup
 - [ ] Cloud backup (OneDrive, Google Drive)
-- [ ] Email notifications
 - [ ] Dark/light theme
 
 ## 🚀 Features
