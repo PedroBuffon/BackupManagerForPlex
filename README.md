@@ -1,8 +1,12 @@
-# Plex Backup Manager
+i# Plex Backup Manager
 
 > [!WARNING]
 > This is app is still in development and bugs/errors can occur middle run.
 > Use it at your own risk.
+
+<div id="header" align="center">
+  <img src="resources/icon.png" width="180"/>
+</div>
 
 A modern and complete Windows Forms application for backing up Plex Media Server database files and registry keys.
 

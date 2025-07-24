@@ -315,7 +315,7 @@ namespace PlexBackupApp
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
-            this.Icon = SystemIcons.Application;
+            this.Icon = new Icon("resources/icon.ico");
             
             // Apply consistent theme - use system default (light theme)
             this.BackColor = SystemColors.Control;
@@ -516,7 +516,7 @@ namespace PlexBackupApp
 
             // Create system tray icon
             notifyIcon = new NotifyIcon();
-            notifyIcon.Icon = SystemIcons.Application;
+            notifyIcon.Icon = new Icon("resources/icon.ico");
             notifyIcon.Text = "Plex Backup Manager";
             notifyIcon.ContextMenuStrip = trayContextMenu;
             notifyIcon.DoubleClick += NotifyIcon_DoubleClick;

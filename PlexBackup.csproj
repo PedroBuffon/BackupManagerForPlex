@@ -9,6 +9,10 @@
     <StartupObject>PlexBackupApp.PlexBackupForm</StartupObject>
   </PropertyGroup>
 
+<PropertyGroup>
+    <ApplicationIcon>resources\icon.ico</ApplicationIcon>
+</PropertyGroup>
+
   <ItemGroup>
     <Compile Remove="PlexBackup.cs" />
   </ItemGroup>
