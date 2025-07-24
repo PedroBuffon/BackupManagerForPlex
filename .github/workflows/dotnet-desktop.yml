@@ -4,15 +4,14 @@
 
 name: Plex Backup Manager Build
 
-# ⚙️ CONFIGURE VERSION HERE - Change this version when you want to create a new release
 env:
   RELEASE_VERSION: "v1.0.2"
 
 on:
   push:
     branches: ["main"]
-  # pull_request:
-  #   branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 permissions:
   contents: write
