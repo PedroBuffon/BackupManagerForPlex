@@ -65,19 +65,33 @@ jobs:
         echo "Ref Name: ${{ github.ref_name }}"
         echo "Release Version: ${{ env.RELEASE_VERSION }}"
 
+    - name: '🔍 Check if tag exists'
+      id: check_tag
+      run: |
+        if (git tag -l "${{ env.RELEASE_VERSION }}") {
+          echo "tag_exists=true" >> $env:GITHUB_OUTPUT
+          Write-Host "Tag ${{ env.RELEASE_VERSION }} already exists"
+        } else {
+          echo "tag_exists=false" >> $env:GITHUB_OUTPUT
+          Write-Host "Tag ${{ env.RELEASE_VERSION }} does not exist"
+        }
+
     - name: '🏷️ Create and Push Tag'
+      if: steps.check_tag.outputs.tag_exists == 'false'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git tag -a "${{ env.RELEASE_VERSION }}" -m "Release ${{ env.RELEASE_VERSION }}" --force
-        git push origin "${{ env.RELEASE_VERSION }}" --force
+        git tag -a "${{ env.RELEASE_VERSION }}" -m "Release ${{ env.RELEASE_VERSION }}"
+        git push origin "${{ env.RELEASE_VERSION }}"
 
     - name: '🔧 Setup .NET'
+      if: steps.check_tag.outputs.tag_exists == 'false'
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 9.0.x
 
     - name: '📦 Package windows x64'
+      if: steps.check_tag.outputs.tag_exists == 'false'
       run: |
         dotnet publish PlexBackup.csproj -r win-x64 -c Release -o bin/win-x64 --self-contained false
         Copy-Item "config.json.example" "bin/win-x64/" -ErrorAction SilentlyContinue
@@ -86,6 +100,7 @@ jobs:
         Compress-Archive -Path "bin/win-x64/*" -DestinationPath "PlexBackup-win-x64.zip"
 
     - name: '📦 Package windows x86'
+      if: steps.check_tag.outputs.tag_exists == 'false'
       run: |
         dotnet publish PlexBackup.csproj -r win-x86 -c Release -o bin/win-x86 --self-contained false
         Copy-Item "config.json.example" "bin/win-x86/" -ErrorAction SilentlyContinue
@@ -94,6 +109,7 @@ jobs:
         Compress-Archive -Path "bin/win-x86/*" -DestinationPath "PlexBackup-win-x86.zip"
 
     - name: '📦 Package windows arm64'
+      if: steps.check_tag.outputs.tag_exists == 'false'
       run: |
         dotnet publish PlexBackup.csproj -r win-arm64 -c Release -o bin/win-arm64 --self-contained false
         Copy-Item "config.json.example" "bin/win-arm64/" -ErrorAction SilentlyContinue
@@ -102,6 +118,7 @@ jobs:
         Compress-Archive -Path "bin/win-arm64/*" -DestinationPath "PlexBackup-win-arm64.zip"
 
     - name: '🚀 Create Release'
+      if: steps.check_tag.outputs.tag_exists == 'false'
       uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

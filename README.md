@@ -1,4 +1,4 @@
-i# Plex Backup Manager
+# Plex Backup Manager
 
 > [!WARNING]
 > This is app is still in development and bugs/errors can occur middle run.
