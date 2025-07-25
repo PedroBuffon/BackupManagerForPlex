@@ -91,9 +91,11 @@ jobs:
     - name: '🔍 Check if release exists'
       id: check_release
       if: steps.check_tag.outputs.tag_exists == 'false'
+      shell: pwsh
       run: |
+        $ErrorActionPreference = 'Continue'
         try {
-          $release = gh release view "${{ env.RELEASE_VERSION }}" --json id 2>$null
+          $release = gh release view "${{ env.RELEASE_VERSION }}" --json id
           if ($release) {
             echo "release_exists=true" >> $env:GITHUB_OUTPUT
             Write-Host "Release ${{ env.RELEASE_VERSION }} already exists"
@@ -103,7 +105,7 @@ jobs:
           }
         } catch {
           echo "release_exists=false" >> $env:GITHUB_OUTPUT
-          Write-Host "Release ${{ env.RELEASE_VERSION }} does not exist"
+          Write-Host "Release ${{ env.RELEASE_VERSION }} does not exist (exception)"
         }
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
