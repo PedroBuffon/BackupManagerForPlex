@@ -8,6 +8,7 @@ using System.Drawing;
 using System.Threading.Tasks;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.IO.Compression;
 
 namespace PlexBackupApp
 {
@@ -38,6 +39,8 @@ namespace PlexBackupApp
         public bool HasShownTrayNotification { get; set; } = false;
         public bool EnableRollback { get; set; } = true;
         public int MaxRollbackAttempts { get; set; } = 3;
+        public string CompressionType { get; set; } = "None"; // None, Zip, 7z, Gzip
+        public int CompressionLevel { get; set; } = 6; // 1-9 for compression level
     }
 
     // Rollback state management
@@ -276,6 +279,7 @@ namespace PlexBackupApp
         private Button btnBackupNow;
         private Button btnScheduleBackup;
         private ComboBox cmbRetentionDays;
+        private ComboBox cmbCompressionType;
         private ProgressBar progressBar;
         private RichTextBox txtLog;
         private Label lblStatus;
@@ -315,7 +319,16 @@ namespace PlexBackupApp
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
-            this.Icon = new Icon("resources/icon.ico");
+            
+            // Try to load icon, but don't crash if it fails
+            try
+            {
+                this.Icon = LoadApplicationIcon();
+            }
+            catch
+            {
+                // Icon loading failed, continue without custom icon
+            }
             
             // Apply consistent theme - use system default (light theme)
             this.BackColor = SystemColors.Control;
@@ -326,7 +339,7 @@ namespace PlexBackupApp
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 8,
+                RowCount = 9,
                 Padding = new Padding(10)
             };
 
@@ -335,7 +348,7 @@ namespace PlexBackupApp
             mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70F));
 
             // Row styles
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < 9; i++)
             {
                 mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             }
@@ -388,6 +401,31 @@ namespace PlexBackupApp
             };
             cmbRetentionDays.Items.AddRange(new string[] { "7 days", "14 days", "30 days", "60 days", "Never delete" });
             cmbRetentionDays.SelectedIndex = 2; // 30 days default
+
+            // Compression Section
+            var lblCompression = new Label
+            {
+                Text = "Compression:",
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                Font = new Font("Arial", 10F, FontStyle.Bold),
+                ForeColor = SystemColors.ControlText
+            };
+
+            cmbCompressionType = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 200,
+                BackColor = SystemColors.Window,
+                ForeColor = SystemColors.WindowText
+            };
+            cmbCompressionType.Items.AddRange(new string[] { 
+                "None (No compression)", 
+                "ZIP (Standard compression)", 
+                "ZIP - Fast (Low compression, faster)", 
+                "ZIP - Best (High compression, slower)" 
+            });
+            cmbCompressionType.SelectedIndex = 0; // None default
 
             // Action Buttons
             var btnPanel = new FlowLayoutPanel
@@ -474,18 +512,23 @@ namespace PlexBackupApp
             mainPanel.Controls.Add(pathPanel, 1, 0);
             mainPanel.Controls.Add(lblRetention, 0, 1);
             mainPanel.Controls.Add(cmbRetentionDays, 1, 1);
-            mainPanel.Controls.Add(new Label { Text = "Actions:", AutoSize = true, Font = new Font("Arial", 10F, FontStyle.Bold), ForeColor = SystemColors.ControlText }, 0, 2);
-            mainPanel.Controls.Add(btnPanel, 1, 2);
-            mainPanel.Controls.Add(progressBar, 0, 4);
+            mainPanel.Controls.Add(lblCompression, 0, 2);
+            mainPanel.Controls.Add(cmbCompressionType, 1, 2);
+            mainPanel.Controls.Add(new Label { Text = "Actions:", AutoSize = true, Font = new Font("Arial", 10F, FontStyle.Bold), ForeColor = SystemColors.ControlText }, 0, 3);
+            mainPanel.Controls.Add(btnPanel, 1, 3);
+            mainPanel.Controls.Add(progressBar, 0, 5);
             mainPanel.SetColumnSpan(progressBar, 2);
-            mainPanel.Controls.Add(lblStatus, 0, 5);
+            mainPanel.Controls.Add(lblStatus, 0, 6);
             mainPanel.SetColumnSpan(lblStatus, 2);
-            mainPanel.Controls.Add(lblLog, 0, 6);
+            mainPanel.Controls.Add(lblLog, 0, 7);
             mainPanel.SetColumnSpan(lblLog, 2);
-            mainPanel.Controls.Add(txtLog, 0, 7);
+            mainPanel.Controls.Add(txtLog, 0, 8);
             mainPanel.SetColumnSpan(txtLog, 2);
 
             this.Controls.Add(mainPanel);
+
+            // Add event handlers
+            cmbCompressionType.SelectedIndexChanged += CmbCompressionType_SelectedIndexChanged;
 
             // Add welcome message to log
             LogMessage("Plex Backup Manager v1.0.0 - Ready for operation", Color.White);
@@ -516,7 +559,15 @@ namespace PlexBackupApp
 
             // Create system tray icon
             notifyIcon = new NotifyIcon();
-            notifyIcon.Icon = new Icon("resources/icon.ico");
+            try
+            {
+                notifyIcon.Icon = LoadApplicationIcon();
+            }
+            catch
+            {
+                // Use default system icon if custom icon fails to load
+                notifyIcon.Icon = SystemIcons.Application;
+            }
             notifyIcon.Text = "Plex Backup Manager";
             notifyIcon.ContextMenuStrip = trayContextMenu;
             notifyIcon.DoubleClick += NotifyIcon_DoubleClick;
@@ -524,6 +575,34 @@ namespace PlexBackupApp
             // Handle form events for minimize to tray
             this.Resize += PlexBackupForm_Resize;
             this.FormClosing += PlexBackupForm_FormClosing;
+        }
+
+        // Helper Methods
+        private Icon LoadApplicationIcon()
+        {
+            // Try to load from startup path first (deployed application)
+            string iconPath = Path.Combine(Application.StartupPath, "resources", "icon.ico");
+            if (File.Exists(iconPath))
+            {
+                return new Icon(iconPath);
+            }
+            
+            // Try relative path (development environment)
+            iconPath = "resources/icon.ico";
+            if (File.Exists(iconPath))
+            {
+                return new Icon(iconPath);
+            }
+            
+            // Try current directory
+            iconPath = Path.Combine(Directory.GetCurrentDirectory(), "resources", "icon.ico");
+            if (File.Exists(iconPath))
+            {
+                return new Icon(iconPath);
+            }
+            
+            // If no custom icon found, return default system icon
+            return SystemIcons.Application;
         }
 
         // Event Handlers
@@ -719,6 +798,18 @@ namespace PlexBackupApp
             Application.Exit();
         }
 
+        // UI Event Handlers
+        private void CmbCompressionType_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            // Save configuration when compression setting changes
+            SaveConfiguration();
+            
+            // Log the compression setting change
+            var compressionTypes = new[] { "None", "ZIP Standard", "ZIP Fast", "ZIP Best" };
+            var selectedType = compressionTypes[cmbCompressionType.SelectedIndex];
+            LogMessage($"Compression setting changed to: {selectedType}", Color.Cyan);
+        }
+
         // Core Backup Methods
         public void PerformPlexBackup()
         {
@@ -797,6 +888,9 @@ namespace PlexBackupApp
                     LogMessage("Restarting Plex Media Server...", Color.Yellow);
                     StartPlexServer();
                 }
+
+                // Apply compression if enabled
+                CompressBackupIfNeeded(weekdayDestination);
 
                 // Clean up rollback temp files on success
                 if (config.EnableRollback)
@@ -1014,6 +1108,205 @@ namespace PlexBackupApp
             {
                 LogMessage($"Warning: Failed to clean old backups: {ex.Message}", Color.Orange);
             }
+        }
+
+        // Compression Methods
+        private void CompressBackupIfNeeded(string backupPath)
+        {
+            if (config.CompressionType.ToLower() == "none")
+            {
+                LogMessage("Compression: Disabled (backup saved as directory)", Color.Gray);
+                return;
+            }
+
+            try
+            {
+                LogMessage($"Starting backup compression using {config.CompressionType} method...", Color.Yellow);
+                LogMessage($"Source directory: {backupPath}", Color.Gray);
+                var compressionStartTime = DateTime.Now;
+
+                switch (config.CompressionType.ToLower())
+                {
+                    case "zip":
+                        LogMessage("Compression Method: ZIP Standard (balanced speed/size)", Color.Cyan);
+                        CompressToZip(backupPath);
+                        break;
+                    case "zip-fast":
+                        LogMessage("Compression Method: ZIP Fast (prioritizing speed)", Color.Cyan);
+                        CompressToZip(backupPath);
+                        break;
+                    case "zip-best":
+                        LogMessage("Compression Method: ZIP Best (maximum compression)", Color.Cyan);
+                        CompressToZip(backupPath);
+                        break;
+                    default:
+                        LogMessage($"Unknown compression type '{config.CompressionType}', skipping compression", Color.Orange);
+                        return;
+                }
+
+                var compressionTime = DateTime.Now - compressionStartTime;
+                LogMessage($"Compression completed successfully in {compressionTime.TotalMinutes:F1} minutes ({compressionTime.TotalSeconds:F0} seconds)", Color.LightGreen);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Compression failed: {ex.Message}", Color.Red);
+                LogMessage("Backup will remain uncompressed (original directory preserved)", Color.Orange);
+                
+                // Log additional details for troubleshooting
+                LogMessage($"Error details: {ex.GetType().Name}", Color.Orange);
+                if (ex.InnerException != null)
+                {
+                    LogMessage($"Inner exception: {ex.InnerException.Message}", Color.Orange);
+                }
+            }
+        }
+
+        private void CompressToZip(string backupPath)
+        {
+            var parentDir = Directory.GetParent(backupPath).FullName;
+            var backupDirName = Path.GetFileName(backupPath);
+            var zipFileName = $"{backupDirName}.zip";
+            var zipFilePath = Path.Combine(parentDir, zipFileName);
+
+            // Get compression level based on settings
+            CompressionLevel compressionLevel;
+            string compressionDescription;
+            switch (config.CompressionType.ToLower())
+            {
+                case "zip-fast":
+                    compressionLevel = CompressionLevel.Fastest;
+                    compressionDescription = "Fastest (Level 1)";
+                    break;
+                case "zip-best":
+                    compressionLevel = CompressionLevel.SmallestSize;
+                    compressionDescription = "Maximum (Level 9)";
+                    break;
+                default:
+                    compressionLevel = CompressionLevel.Optimal;
+                    compressionDescription = "Optimal (Level 6)";
+                    break;
+            }
+
+            LogMessage($"Creating ZIP archive: {zipFileName}", Color.Cyan);
+            LogMessage($"Compression level: {compressionDescription}", Color.Gray);
+            LogMessage($"Target location: {zipFilePath}", Color.Gray);
+
+            // Get original size and file count
+            var dirInfo = new DirectoryInfo(backupPath);
+            var allFiles = dirInfo.GetFiles("*", SearchOption.AllDirectories);
+            var originalSize = allFiles.Sum(f => f.Length);
+            var totalFiles = allFiles.Length;
+            
+            LogMessage($"Original backup: {FormatBytes(originalSize)} ({totalFiles:N0} files)", Color.Gray);
+
+            var processingStartTime = DateTime.Now;
+            var processedFiles = 0;
+            var processedBytes = 0L;
+
+            // Create ZIP archive
+            using (var zip = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))
+            {
+                foreach (var file in allFiles)
+                {
+                    var relativePath = Path.GetRelativePath(backupPath, file.FullName);
+                    
+                    // Create entry with compression level
+                    var entry = zip.CreateEntry(relativePath, compressionLevel);
+                    
+                    using (var entryStream = entry.Open())
+                    using (var fileStream = File.OpenRead(file.FullName))
+                    {
+                        fileStream.CopyTo(entryStream);
+                    }
+
+                    processedFiles++;
+                    processedBytes += file.Length;
+                    
+                    // Log progress for every 100 files, large files, or every 10% completion
+                    var progressPercent = (processedFiles * 100) / totalFiles;
+                    bool shouldLog = processedFiles % 100 == 0 || 
+                                   file.Length > 10 * 1024 * 1024 || 
+                                   progressPercent % 10 == 0 && progressPercent > 0;
+                    
+                    if (shouldLog)
+                    {
+                        var elapsed = DateTime.Now - processingStartTime;
+                        var currentSpeed = elapsed.TotalSeconds > 0 ? (processedBytes / (1024 * 1024)) / elapsed.TotalSeconds : 0;
+                        LogMessage($"Progress: {progressPercent}% ({processedFiles:N0}/{totalFiles:N0} files) - Speed: {currentSpeed:F1} MB/s", Color.Gray);
+                        
+                        if (file.Length > 10 * 1024 * 1024)
+                        {
+                            LogMessage($"Processing large file: {file.Name} ({FormatBytes(file.Length)})", Color.Gray);
+                        }
+                    }
+                }
+            }
+
+            // Get compressed size and calculate compression statistics
+            var compressedSize = new FileInfo(zipFilePath).Length;
+            var compressionRatio = ((double)(originalSize - compressedSize) / originalSize) * 100;
+            var totalTime = DateTime.Now - processingStartTime;
+            var avgSpeed = totalTime.TotalSeconds > 0 ? (originalSize / (1024 * 1024)) / totalTime.TotalSeconds : 0;
+            
+            LogMessage($"Compression Statistics:", Color.LightGreen);
+            LogMessage($"   Original size: {FormatBytes(originalSize)}", Color.Cyan);
+            LogMessage($"   Compressed size: {FormatBytes(compressedSize)}", Color.Cyan);
+            LogMessage($"   Space saved: {FormatBytes(originalSize - compressedSize)} ({compressionRatio:F1}%)", Color.LightGreen);
+            LogMessage($"   Processing time: {totalTime.TotalMinutes:F1} minutes", Color.Cyan);
+            LogMessage($"   Average speed: {avgSpeed:F1} MB/s", Color.Cyan);
+
+            // Remove original folder after successful compression
+            try
+            {
+                LogMessage($"Removing original backup folder...", Color.Yellow);
+                Directory.Delete(backupPath, true);
+                LogMessage($"Original backup folder removed successfully", Color.Gray);
+                LogMessage($"Backup is now available as: {zipFileName}", Color.LightGreen);
+                
+                // Update rollback state to point to the ZIP file instead
+                if (rollbackState != null)
+                {
+                    rollbackState.BackupDestination = zipFilePath;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Warning: Could not remove original folder: {ex.Message}", Color.Orange);
+                LogMessage($"Both compressed file and original folder exist", Color.Orange);
+                LogMessage($"You may manually delete the original folder: {backupPath}", Color.Gray);
+            }
+        }
+
+        private long GetDirectorySize(DirectoryInfo dirInfo)
+        {
+            long size = 0;
+            try
+            {
+                foreach (FileInfo file in dirInfo.GetFiles("*", SearchOption.AllDirectories))
+                {
+                    size += file.Length;
+                }
+            }
+            catch (Exception)
+            {
+                // Ignore access denied errors
+            }
+            return size;
+        }
+
+        private string FormatBytes(long bytes)
+        {
+            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+            double len = bytes;
+            int order = 0;
+            
+            while (len >= 1024 && order < sizes.Length - 1)
+            {
+                order++;
+                len = len / 1024;
+            }
+            
+            return $"{len:0.##} {sizes[order]}";
         }
 
         // Rollback System Methods
@@ -1236,6 +1529,26 @@ namespace PlexBackupApp
             if (config.RetentionDays >= 0 && config.RetentionDays < cmbRetentionDays.Items.Count)
                 cmbRetentionDays.SelectedIndex = config.RetentionDays;
 
+            // Load compression settings
+            switch (config.CompressionType.ToLower())
+            {
+                case "none":
+                    cmbCompressionType.SelectedIndex = 0;
+                    break;
+                case "zip":
+                    cmbCompressionType.SelectedIndex = 1;
+                    break;
+                case "zip-fast":
+                    cmbCompressionType.SelectedIndex = 2;
+                    break;
+                case "zip-best":
+                    cmbCompressionType.SelectedIndex = 3;
+                    break;
+                default:
+                    cmbCompressionType.SelectedIndex = 0;
+                    break;
+            }
+
             // Apply system tray configuration
             if (config.MinimizeToTray)
             {
@@ -1257,6 +1570,29 @@ namespace PlexBackupApp
                 // Update config from UI
                 config.BackupPath = txtBackupPath.Text;
                 config.RetentionDays = cmbRetentionDays.SelectedIndex;
+                
+                // Update compression settings
+                switch (cmbCompressionType.SelectedIndex)
+                {
+                    case 0:
+                        config.CompressionType = "None";
+                        break;
+                    case 1:
+                        config.CompressionType = "Zip";
+                        config.CompressionLevel = 6; // Standard compression
+                        break;
+                    case 2:
+                        config.CompressionType = "Zip-Fast";
+                        config.CompressionLevel = 1; // Fast compression
+                        break;
+                    case 3:
+                        config.CompressionType = "Zip-Best";
+                        config.CompressionLevel = 9; // Best compression
+                        break;
+                    default:
+                        config.CompressionType = "None";
+                        break;
+                }
 
                 // Save as JSON
                 SaveJsonConfiguration();
@@ -1475,6 +1811,7 @@ namespace PlexBackupApp
 
             if (Directory.Exists(backupPath))
             {
+                // Load directory backups (uncompressed)
                 foreach (var dir in Directory.GetDirectories(backupPath))
                 {
                     var dirInfo = new DirectoryInfo(dir);
@@ -1482,7 +1819,8 @@ namespace PlexBackupApp
                     {
                         BackupName = dirInfo.Name,
                         DateCreated = dirInfo.CreationTime.ToString("dd/MM/yyyy HH:mm"),
-                        FullPath = dirInfo.FullName
+                        FullPath = dirInfo.FullName,
+                        IsCompressed = false
                     };
 
                     // Calculate size
@@ -1490,6 +1828,33 @@ namespace PlexBackupApp
                     {
                         long folderSize = GetDirectorySize(dirInfo);
                         backup.Size = FormatBytes(folderSize);
+                    }
+                    catch
+                    {
+                        backup.Size = "N/A";
+                    }
+
+                    backupData.Add(backup);
+                }
+
+                // Load ZIP file backups (compressed)
+                foreach (var zipFile in Directory.GetFiles(backupPath, "*.zip"))
+                {
+                    var fileInfo = new FileInfo(zipFile);
+                    var backupName = Path.GetFileNameWithoutExtension(zipFile);
+                    
+                    var backup = new BackupInfo
+                    {
+                        BackupName = $"{backupName} (Compressed)",
+                        DateCreated = fileInfo.CreationTime.ToString("dd/MM/yyyy HH:mm"),
+                        FullPath = fileInfo.FullName,
+                        IsCompressed = true
+                    };
+
+                    // Get compressed file size
+                    try
+                    {
+                        backup.Size = FormatBytes(fileInfo.Length);
                     }
                     catch
                     {
@@ -1606,23 +1971,358 @@ namespace PlexBackupApp
             }
         }
 
+        private void LogToConsoleAndUI(string message, RestoreProgressForm progressForm = null)
+        {
+            // Log to console for debugging
+            Console.WriteLine($"[EXTRACT] {message}");
+            
+            // Log to UI if available and not disposed
+            if (progressForm != null && !progressForm.IsDisposed)
+            {
+                progressForm.LogInfo(message);
+            }
+        }
+
+        private string ExtractCompressedBackup(BackupInfo backup, RestoreProgressForm progressForm = null)
+        {
+            if (!backup.IsCompressed)
+            {
+                LogToConsoleAndUI("Backup is not compressed, using original path", progressForm);
+                return backup.FullPath; // Return original path if not compressed
+            }
+
+            try
+            {
+                var extractPath = Path.Combine(Path.GetDirectoryName(backup.FullPath), 
+                                             Path.GetFileNameWithoutExtension(backup.FullPath) + "_extracted");
+
+                LogToConsoleAndUI("Starting backup extraction for restore operation...", progressForm);
+                LogToConsoleAndUI($"Source ZIP file: {backup.FullPath}", progressForm);
+                LogToConsoleAndUI($"Extraction target: {extractPath}", progressForm);
+                
+                if (progressForm != null && !progressForm.IsDisposed)
+                {
+                    progressForm.UpdateStatus("Extracting compressed backup...");
+                }
+
+                // Remove existing extraction folder if it exists
+                if (Directory.Exists(extractPath))
+                {
+                    LogToConsoleAndUI("Removing existing extraction folder...", progressForm);
+                    Directory.Delete(extractPath, true);
+                }
+
+                var extractionStartTime = DateTime.Now;
+                
+                // Extract ZIP file with console output for debugging
+                using (var archive = ZipFile.OpenRead(backup.FullPath))
+                {
+                    var totalEntries = archive.Entries.Count;
+                    var extractedEntries = 0;
+                    var totalBytes = archive.Entries.Sum(e => e.Length);
+                    var extractedBytes = 0L;
+                    var lastReportTime = DateTime.Now;
+
+                    LogToConsoleAndUI($"ZIP archive contains {totalEntries:N0} entries ({FormatBytes(totalBytes)})", progressForm);
+                    LogToConsoleAndUI("Beginning extraction process...", progressForm);
+                    
+                    if (progressForm != null && !progressForm.IsDisposed)
+                    {
+                        progressForm.UpdateOperation($"Extracting {totalEntries:N0} files ({FormatBytes(totalBytes)})...");
+                    }
+
+                    foreach (var entry in archive.Entries)
+                    {
+                        var destinationPath = Path.Combine(extractPath, entry.FullName);
+                        var destinationDir = Path.GetDirectoryName(destinationPath);
+
+                        // Create directory if it doesn't exist
+                        if (!Directory.Exists(destinationDir))
+                        {
+                            Directory.CreateDirectory(destinationDir);
+                        }
+
+                        // Extract file if it's not a directory
+                        if (!string.IsNullOrEmpty(entry.Name))
+                        {
+                            entry.ExtractToFile(destinationPath, true);
+                            extractedBytes += entry.Length;
+
+                            // Log large files to console and UI
+                            if (entry.Length > 10 * 1024 * 1024) // Files larger than 10MB
+                            {
+                                LogToConsoleAndUI($"Extracted large file: {entry.Name} ({FormatBytes(entry.Length)})", progressForm);
+                            }
+                        }
+
+                        extractedEntries++;
+
+                        // Report progress every 2 seconds or every 1000 files
+                        var now = DateTime.Now;
+                        if ((now - lastReportTime).TotalSeconds >= 2 || extractedEntries % 1000 == 0)
+                        {
+                            var percentage = (double)extractedEntries / totalEntries * 100;
+                            var speed = extractedBytes / (now - extractionStartTime).TotalSeconds;
+                            var progressMessage = $"Extraction progress: {percentage:F1}% ({extractedEntries:N0}/{totalEntries:N0} files) - Speed: {FormatBytes((long)speed)}/s";
+                            
+                            LogToConsoleAndUI(progressMessage, progressForm);
+                            if (progressForm != null && !progressForm.IsDisposed)
+                            {
+                                progressForm.UpdateProgress((int)percentage);
+                                progressForm.UpdateOperation($"Extracting... {extractedEntries:N0}/{totalEntries:N0} files ({FormatBytes((long)speed)}/s)");
+                            }
+                            
+                            lastReportTime = now;
+                        }
+                    }
+
+                    var extractionDuration = DateTime.Now - extractionStartTime;
+                    var averageSpeed = extractedBytes / extractionDuration.TotalSeconds;
+
+                    LogToConsoleAndUI("=== Extraction Statistics ===", progressForm);
+                    LogToConsoleAndUI($"Files extracted: {extractedEntries:N0}", progressForm);
+                    LogToConsoleAndUI($"Total data extracted: {FormatBytes(extractedBytes)}", progressForm);
+                    LogToConsoleAndUI($"Extraction time: {extractionDuration.TotalMinutes:F1} minutes ({extractionDuration.TotalSeconds:F0} seconds)", progressForm);
+                    LogToConsoleAndUI($"Average speed: {FormatBytes((long)averageSpeed)}/s", progressForm);
+                    LogToConsoleAndUI("Extraction completed successfully", progressForm);
+                    LogToConsoleAndUI($"Extracted backup ready at: {extractPath}", progressForm);
+                    
+                    if (progressForm != null && !progressForm.IsDisposed)
+                    {
+                        progressForm.UpdateStatus("Extraction completed successfully");
+                        progressForm.UpdateProgress(100);
+                    }
+                }
+
+                return extractPath;
+            }
+            catch (Exception ex)
+            {
+                var errorMsg = $"Failed to extract compressed backup: {ex.Message}";
+                LogToConsoleAndUI(errorMsg, progressForm);
+                if (progressForm != null && !progressForm.IsDisposed)
+                {
+                    progressForm.LogError(errorMsg);
+                }
+                throw new Exception($"Cannot extract compressed backup: {ex.Message}");
+            }
+        }
+
+        private void CleanupExtractedBackup(BackupInfo backup, string extractedPath, RestoreProgressForm progressForm = null)
+        {
+            if (!backup.IsCompressed || string.IsNullOrEmpty(extractedPath) || 
+                extractedPath == backup.FullPath || !Directory.Exists(extractedPath))
+            {
+                Console.WriteLine("[CLEANUP] No extraction cleanup needed");
+                // Only log to UI if form is still available and not disposed
+                if (progressForm != null && !progressForm.IsDisposed)
+                {
+                    progressForm.LogInfo("No extraction cleanup needed");
+                }
+                return; // Nothing to clean up
+            }
+
+            try
+            {
+                Console.WriteLine("[CLEANUP] Starting cleanup of extracted backup folder...");
+                Console.WriteLine($"[CLEANUP] Target folder: {extractedPath}");
+                
+                // Only update UI if form is still available and not disposed
+                if (progressForm != null && !progressForm.IsDisposed)
+                {
+                    progressForm.UpdateStatus("Cleaning up extracted files...");
+                    progressForm.LogInfo("Starting cleanup of extracted backup folder...");
+                    progressForm.LogInfo($"Target folder: {extractedPath}");
+                }
+                
+                // Get folder info for logging
+                var dirInfo = new DirectoryInfo(extractedPath);
+                var fileCount = dirInfo.GetFiles("*", SearchOption.AllDirectories).Length;
+                var folderSize = GetDirectorySize(dirInfo);
+                
+                var cleanupMessage = $"Removing {fileCount:N0} files ({FormatBytes(folderSize)}) from extraction folder";
+                Console.WriteLine($"[CLEANUP] {cleanupMessage}");
+                if (progressForm != null && !progressForm.IsDisposed)
+                {
+                    progressForm.LogInfo(cleanupMessage);
+                }
+                
+                // Attempt to delete the extracted folder
+                Directory.Delete(extractedPath, true);
+                
+                Console.WriteLine("[CLEANUP] Extracted backup folder removed successfully");
+                if (progressForm != null && !progressForm.IsDisposed)
+                {
+                    progressForm.LogInfo("Extracted backup folder removed successfully");
+                    progressForm.UpdateStatus("Cleanup completed");
+                }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Console.WriteLine($"[CLEANUP] Access denied during cleanup: {ex.Message}");
+                if (progressForm != null && !progressForm.IsDisposed)
+                {
+                    progressForm.LogWarning($"Access denied during cleanup: {ex.Message}");
+                }
+                // Access denied - files might be in use
+                try
+                {
+                    Console.WriteLine("[CLEANUP] Attempting to clear read-only attributes and retry...");
+                    if (progressForm != null && !progressForm.IsDisposed)
+                    {
+                        progressForm.LogInfo("Attempting to clear read-only attributes and retry...");
+                    }
+                    // Try to force delete by clearing read-only attributes
+                    ClearReadOnlyAttributes(extractedPath);
+                    Directory.Delete(extractedPath, true);
+                    Console.WriteLine("[CLEANUP] Cleanup successful after clearing read-only attributes");
+                    if (progressForm != null && !progressForm.IsDisposed)
+                    {
+                        progressForm.LogInfo("Cleanup successful after clearing read-only attributes");
+                    }
+                }
+                catch (Exception retryEx)
+                {
+                    Console.WriteLine($"[CLEANUP] Retry failed: {retryEx.Message}");
+                    if (progressForm != null && !progressForm.IsDisposed)
+                    {
+                        progressForm.LogWarning($"Retry failed: {retryEx.Message}");
+                    }
+                    // Final fallback - schedule for deletion on next reboot if possible
+                    ScheduleForDeletion(extractedPath);
+                }
+            }
+            catch (IOException ex)
+            {
+                Console.WriteLine($"[CLEANUP] I/O error during cleanup: {ex.Message}");
+                if (progressForm != null && !progressForm.IsDisposed)
+                {
+                    progressForm.LogWarning($"I/O error during cleanup: {ex.Message}");
+                }
+                // I/O error - files might be in use
+                ScheduleForDeletion(extractedPath);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[CLEANUP] Unexpected error during cleanup: {ex.Message}");
+                if (progressForm != null && !progressForm.IsDisposed)
+                {
+                    progressForm.LogWarning($"Unexpected error during cleanup: {ex.Message}");
+                }
+                // Other errors - just ignore, user can manually delete
+            }
+        }
+
+        private void ClearReadOnlyAttributes(string path)
+        {
+            try
+            {
+                var dirInfo = new DirectoryInfo(path);
+                
+                // Clear read-only attribute on directory
+                if (dirInfo.Attributes.HasFlag(FileAttributes.ReadOnly))
+                {
+                    dirInfo.Attributes &= ~FileAttributes.ReadOnly;
+                }
+
+                // Clear read-only attributes on all files
+                foreach (var file in dirInfo.GetFiles("*", SearchOption.AllDirectories))
+                {
+                    if (file.Attributes.HasFlag(FileAttributes.ReadOnly))
+                    {
+                        file.Attributes &= ~FileAttributes.ReadOnly;
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore errors in cleanup
+            }
+        }
+
+        private void ScheduleForDeletion(string path)
+        {
+            try
+            {
+                // On Windows, we can try to move to temp and schedule for deletion
+                var tempPath = Path.Combine(Path.GetTempPath(), $"PlexBackup_Cleanup_{Guid.NewGuid()}");
+                Directory.Move(path, tempPath);
+                
+                // Try to delete from temp location
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        System.Threading.Thread.Sleep(5000); // Wait 5 seconds
+                        Directory.Delete(tempPath, true);
+                    }
+                    catch
+                    {
+                        // Final attempt failed, leave it in temp
+                    }
+                });
+            }
+            catch
+            {
+                // If we can't even move it, just leave it
+            }
+        }
+
         private async void RestoreBackup(BackupInfo backup)
         {
+            Console.WriteLine($"[RESTORE] Starting restore operation for backup: {backup.BackupName}");
+            Console.WriteLine($"[RESTORE] Backup path: {backup.FullPath}");
+            Console.WriteLine($"[RESTORE] Backup type: {(backup.IsCompressed ? "Compressed (ZIP)" : "Uncompressed (Directory)")}");
+            
             // Pre-restore validation
             if (!RestoreUtilities.ValidateBackupIntegrity(backup.FullPath))
             {
-                MessageBox.Show("The selected backup appears to be corrupted or incomplete. Cannot proceed with restore.", 
+                Console.WriteLine("[RESTORE] ERROR: Backup validation failed!");
+                string debugInfo = "";
+                try
+                {
+                    if (backup.IsCompressed)
+                    {
+                        debugInfo = $"\nDebug Info: Compressed backup validation failed.\nFile path: {backup.FullPath}\nFile exists: {File.Exists(backup.FullPath)}";
+                        if (File.Exists(backup.FullPath))
+                        {
+                            using (var archive = ZipFile.OpenRead(backup.FullPath))
+                            {
+                                debugInfo += $"\nZIP entries count: {archive.Entries.Count}";
+                                if (archive.Entries.Count > 0)
+                                {
+                                    debugInfo += $"\nFirst few entries: {string.Join(", ", archive.Entries.Take(5).Select(e => e.FullName))}";
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        debugInfo = $"\nDebug Info: Directory backup validation failed.\nDirectory path: {backup.FullPath}\nDirectory exists: {Directory.Exists(backup.FullPath)}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    debugInfo += $"\nDebug error: {ex.Message}";
+                }
+                
+                MessageBox.Show($"The selected backup appears to be corrupted or incomplete. Cannot proceed with restore.{debugInfo}", 
                               "Invalid Backup", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
+            
+            Console.WriteLine("[RESTORE] Backup validation passed");
 
             // Check available disk space
             if (!RestoreUtilities.CheckDiskSpaceForRestore(backup.FullPath))
             {
+                Console.WriteLine("[RESTORE] ERROR: Insufficient disk space for restore operation");
                 MessageBox.Show("Insufficient disk space to perform restore operation.", 
                               "Insufficient Space", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
+            
+            Console.WriteLine("[RESTORE] Disk space check passed");
 
             var result = MessageBox.Show(
                 $"Are you sure you want to restore the backup '{backup.BackupName}'?\n\n" +
@@ -1643,24 +2343,46 @@ namespace PlexBackupApp
 
             if (result == DialogResult.Yes)
             {
+                Console.WriteLine("[RESTORE] User confirmed restore operation");
+                
                 // Create and show progress form
                 var progressForm = new RestoreProgressForm();
                 progressForm.Show();
                 
+                // Add initial logs to progress form
+                progressForm.LogInfo($"Starting restore operation for backup: {backup.BackupName}");
+                progressForm.LogInfo($"Backup path: {backup.FullPath}");
+                progressForm.LogInfo($"Backup type: {(backup.IsCompressed ? "Compressed (ZIP)" : "Uncompressed (Directory)")}");
+                progressForm.LogInfo("Backup validation passed");
+                progressForm.LogInfo("Disk space check passed");
+                progressForm.LogInfo("User confirmed restore operation");
+                
                 var restoreLogger = new RestoreLogger();
                 string safetyBackupPath = "";
+                string actualBackupPath = "";
                 
                 try
                 {
+                    Console.WriteLine("[RESTORE] Disabling UI controls during restore");
+                    progressForm.LogInfo("Disabling UI controls during restore");
                     // Disable all controls during restore
                     this.Enabled = false;
+                    
+                    Console.WriteLine("[RESTORE] Starting backup extraction (if needed)");
+                    progressForm.LogInfo("Starting backup extraction (if needed)");
+                    // Extract compressed backup if needed
+                    actualBackupPath = ExtractCompressedBackup(backup, progressForm);
+                    
+                    Console.WriteLine("[RESTORE] Starting restore task with timeout monitoring");
+                    progressForm.LogInfo("Starting main restore task with timeout monitoring");
+                    progressForm.UpdateStatus("Performing backup restore...");
                     
                     await Task.Run(() => 
                     {
                         // Create a task with timeout monitoring
                         var restoreTask = Task.Run(() => 
                         {
-                            safetyBackupPath = PerformBackupRestore(backup.FullPath, progressForm, restoreLogger);
+                            safetyBackupPath = PerformBackupRestore(actualBackupPath, progressForm, restoreLogger);
                         });
                         
                         // Wait with timeout (30 minutes)
@@ -1670,6 +2392,14 @@ namespace PlexBackupApp
                             throw new TimeoutException($"Restore operation timed out after {timeoutMinutes} minutes. This may indicate a stuck process or very large backup.");
                         }
                     });
+                    
+                    Console.WriteLine("[RESTORE] Restore task completed, capturing logs");
+                    progressForm.LogInfo("Restore task completed, capturing logs");
+                    progressForm.UpdateStatus("Restore completed, capturing logs...");
+                    
+                    Console.WriteLine("[RESTORE] Cleaning up extracted backup folder (if applicable)");
+                    // Cleanup extracted backup if it was compressed (BEFORE closing the form)
+                    CleanupExtractedBackup(backup, actualBackupPath, progressForm);
                     
                     // Capture logs before closing the progress form
                     var progressFormLogs = progressForm.GetAllLogs();
@@ -1694,6 +2424,8 @@ namespace PlexBackupApp
                                       "\n\n=== DETAILED PROGRESS LOGS ===\n\n" +
                                       (string.IsNullOrEmpty(progressFormLogs) ? "No progress logs available.\n" : progressFormLogs);
                     
+                    Console.WriteLine("[RESTORE] SUCCESS: Restore operation completed successfully");
+                    
                     // Show custom restore complete form with comprehensive log viewer button
                     using (var restoreCompleteForm = new RestoreCompleteForm(successMessage, combinedLogs, true))
                     {
@@ -1702,6 +2434,15 @@ namespace PlexBackupApp
                 }
                 catch (Exception ex)
                 {
+                    Console.WriteLine($"[RESTORE] ERROR: Restore operation failed - {ex.Message}");
+                    
+                    // Cleanup extracted backup if it was compressed (even on failure) - BEFORE closing the form
+                    if (backup.IsCompressed && !string.IsNullOrEmpty(actualBackupPath))
+                    {
+                        Console.WriteLine("[RESTORE] Cleaning up extracted backup after failure");
+                        CleanupExtractedBackup(backup, actualBackupPath, progressForm);
+                    }
+                    
                     // Capture logs before closing the progress form
                     var progressErrorLogs = progressForm.GetAllLogs();
                     progressForm.Close();
@@ -1711,6 +2452,7 @@ namespace PlexBackupApp
                     
                     if (!string.IsNullOrEmpty(safetyBackupPath))
                     {
+                        Console.WriteLine($"[RESTORE] Safety backup is available at: {safetyBackupPath}");
                         errorMessage += $"Safety backup is available at:\n{safetyBackupPath}\n\n" +
                                       "Would you like to automatically rollback to the safety backup?";
                         
@@ -1719,6 +2461,7 @@ namespace PlexBackupApp
                         
                         if (rollbackResult == DialogResult.Yes)
                         {
+                            Console.WriteLine("[RESTORE] User chose to rollback to safety backup");
                             try
                             {
                                 var rollbackProgress = new RestoreProgressForm();
@@ -1726,19 +2469,26 @@ namespace PlexBackupApp
                                 await Task.Run(() => RollbackToSafetyBackup(safetyBackupPath, rollbackProgress));
                                 rollbackProgress.Close();
                                 
+                                Console.WriteLine("[RESTORE] Rollback completed successfully");
                                 MessageBox.Show("System successfully rolled back to safety backup.", 
                                               "Rollback Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
                             }
                             catch (Exception rollbackEx)
                             {
+                                Console.WriteLine($"[RESTORE] ERROR: Rollback failed - {rollbackEx.Message}");
                                 MessageBox.Show($"Rollback failed: {rollbackEx.Message}\n\n" +
                                               $"Manual recovery may be required using the safety backup at:\n{safetyBackupPath}", 
                                               "Rollback Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             }
                         }
+                        else
+                        {
+                            Console.WriteLine("[RESTORE] User declined rollback to safety backup");
+                        }
                     }
                     else
                     {
+                        Console.WriteLine("[RESTORE] No safety backup available for rollback");
                         // Combine logs from both RestoreLogger and RestoreProgressForm for error case
                         var restoreLoggerErrorContent = restoreLogger.GetFullLog();
                         
@@ -1763,9 +2513,16 @@ namespace PlexBackupApp
                 }
                 finally
                 {
+                    Console.WriteLine("[RESTORE] Restore operation completed, performing cleanup");
+                    
                     // Re-enable controls
                     this.Enabled = true;
+                    Console.WriteLine("[RESTORE] UI controls re-enabled");
                 }
+            }
+            else
+            {
+                Console.WriteLine("[RESTORE] User canceled restore operation");
             }
         }
 
@@ -1782,7 +2539,17 @@ namespace PlexBackupApp
             {
                 try
                 {
-                    Directory.Delete(backup.FullPath, true);
+                    if (backup.IsCompressed)
+                    {
+                        // Delete ZIP file
+                        File.Delete(backup.FullPath);
+                    }
+                    else
+                    {
+                        // Delete directory
+                        Directory.Delete(backup.FullPath, true);
+                    }
+                    
                     MessageBox.Show("Backup deleted successfully!", "Delete Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     LoadBackupData(); // Refresh the list
                 }
@@ -2653,6 +3420,7 @@ namespace PlexBackupApp
         public string DateCreated { get; set; }
         public string Size { get; set; }
         public string FullPath { get; set; }
+        public bool IsCompressed { get; set; } = false;
     }
 
     // Restore operation logger
@@ -2712,10 +3480,20 @@ namespace PlexBackupApp
         {
             try
             {
-                // Check if backup directory exists
-                if (!Directory.Exists(backupPath))
+                // Check if the path exists as a file (ZIP) or directory
+                bool isZipFile = File.Exists(backupPath) && Path.GetExtension(backupPath).ToLower() == ".zip";
+                bool isDirectory = Directory.Exists(backupPath);
+                
+                if (!isZipFile && !isDirectory)
                     return false;
-
+                
+                // Check if it's a ZIP file (compressed backup)
+                if (isZipFile)
+                {
+                    return ValidateZipBackupIntegrity(backupPath);
+                }
+                
+                // Handle directory backup (uncompressed backup)
                 // Check for essential backup components
                 var regBackupPath = Path.Combine(backupPath, "RegBackup");
                 var fileBackupPath = Path.Combine(backupPath, "FileBackup");
@@ -2751,12 +3529,55 @@ namespace PlexBackupApp
             }
         }
 
+        private static bool ValidateZipBackupIntegrity(string zipPath)
+        {
+            try
+            {
+                using (var archive = ZipFile.OpenRead(zipPath))
+                {
+                    // Basic validation: ZIP file should have entries and be readable
+                    if (archive.Entries.Count == 0)
+                        return false;
+                    
+                    // Check for backup-related content (more flexible approach)
+                    var hasBackupContent = archive.Entries.Any(e => 
+                        e.FullName.Contains("RegBackup") || 
+                        e.FullName.Contains("FileBackup") ||
+                        e.FullName.Contains("Preferences.xml") ||
+                        e.FullName.Contains("library.db") ||
+                        e.FullName.EndsWith(".reg"));
+                    
+                    return hasBackupContent;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public static bool CheckDiskSpaceForRestore(string backupPath)
         {
             try
             {
-                // Calculate backup size
-                var backupSize = GetDirectorySize(new DirectoryInfo(backupPath));
+                long backupSize;
+                
+                // Check if it's a ZIP file (compressed backup)
+                if (File.Exists(backupPath) && Path.GetExtension(backupPath).ToLower() == ".zip")
+                {
+                    // For ZIP files, we need to estimate uncompressed size
+                    // Use ZIP file size * 3 as a conservative estimate for uncompressed size
+                    backupSize = new FileInfo(backupPath).Length * 3;
+                }
+                else if (Directory.Exists(backupPath))
+                {
+                    // Calculate backup size for directory
+                    backupSize = GetDirectorySize(new DirectoryInfo(backupPath));
+                }
+                else
+                {
+                    return false; // Path doesn't exist
+                }
                 
                 // Get available space on target drive (usually C:)
                 var targetDrive = new DriveInfo(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData).Substring(0, 1));
