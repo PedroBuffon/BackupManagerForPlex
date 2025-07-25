@@ -69,6 +69,18 @@ jobs:
         echo "Ref Name: ${{ github.ref_name }}"
         echo "Release Version: ${{ env.RELEASE_VERSION }}"
 
+    - name: '🔍 Setup GitHub CLI'
+      uses: actions/setup-go@v4
+      with:
+        go-version: stable
+    
+    - name: '📥 Install GitHub CLI'
+      run: |
+        if (!(Get-Command gh -ErrorAction SilentlyContinue)) {
+          winget install --id GitHub.cli
+        }
+        gh --version
+
     - name: '🔍 Check if tag exists'
       id: check_tag
       run: |
