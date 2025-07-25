@@ -68,13 +68,8 @@ jobs:
         echo "Ref: ${{ github.ref }}"
         echo "Ref Name: ${{ github.ref_name }}"
         echo "Release Version: ${{ env.RELEASE_VERSION }}"
-
-    - name: '🔍 Setup GitHub CLI'
-      uses: actions/setup-go@v4
-      with:
-        go-version: stable
     
-    - name: '📥 Install GitHub CLI'
+    - name: '📥 Setup GitHub CLI'
       run: |
         if (!(Get-Command gh -ErrorAction SilentlyContinue)) {
           winget install --id GitHub.cli
@@ -107,6 +102,9 @@ jobs:
         git config --local user.name "GitHub Action"
         git tag -a "${{ env.RELEASE_VERSION }}" -m "Release ${{ env.RELEASE_VERSION }}"
         git push origin "${{ env.RELEASE_VERSION }}"
+
+    - name: 🕐 Wait for GitHub to register tag
+      run: sleep 10
 
     - name: '🔍 Check if release exists'
       id: check_release
