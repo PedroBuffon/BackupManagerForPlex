@@ -127,7 +127,7 @@ jobs:
 
     - name: '🔍 Check if release exists'
       id: check_release
-      if: steps.created_tag.outputs.tag_exists == 'false'
+      if: steps.check_tag.outputs.tag_exists == 'false'
       run: |
         try {
           $release = gh release view "${{ env.RELEASE_VERSION }}" --json id 2>$null
@@ -146,13 +146,13 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: '🔧 Setup .NET'
-      if: steps.created_tag.outputs.tag_exists == 'false'
+      if: steps.check_tag.outputs.tag_exists == 'false'
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 9.0.x
 
     - name: '📦 Package windows x64'
-      if: steps.created_tag.outputs.tag_exists == 'false'
+      if: steps.check_tag.outputs.tag_exists == 'false'
       run: |
         dotnet publish PlexBackup.csproj -r win-x64 -c Release -o bin/win-x64 --self-contained false
         Copy-Item "config.json.example" "bin/win-x64/" -ErrorAction SilentlyContinue
@@ -161,7 +161,7 @@ jobs:
         Compress-Archive -Path "bin/win-x64/*" -DestinationPath "PlexBackup-win-x64.zip"
 
     - name: '📦 Package windows x86'
-      if: steps.created_tag.outputs.tag_exists == 'false'
+      if: steps.check_tag.outputs.tag_exists == 'false'
       run: |
         dotnet publish PlexBackup.csproj -r win-x86 -c Release -o bin/win-x86 --self-contained false
         Copy-Item "config.json.example" "bin/win-x86/" -ErrorAction SilentlyContinue
@@ -170,7 +170,7 @@ jobs:
         Compress-Archive -Path "bin/win-x86/*" -DestinationPath "PlexBackup-win-x86.zip"
 
     - name: '📦 Package windows arm64'
-      if: steps.created_tag.outputs.tag_exists == 'false'
+      if: steps.check_tag.outputs.tag_exists == 'false'
       run: |
         dotnet publish PlexBackup.csproj -r win-arm64 -c Release -o bin/win-arm64 --self-contained false
         Copy-Item "config.json.example" "bin/win-arm64/" -ErrorAction SilentlyContinue
@@ -179,7 +179,7 @@ jobs:
         Compress-Archive -Path "bin/win-arm64/*" -DestinationPath "PlexBackup-win-arm64.zip"
 
     - name: '🚀 Create Release'
-      if: steps.created_tag.outputs.tag_exists == 'false' && (steps.check_release.outputs.release_exists == 'false' || steps.check_release.conclusion == 'skipped')
+      if: steps.check_tag.outputs.tag_exists == 'false' && (steps.check_release.outputs.release_exists == 'false' || steps.check_release.conclusion == 'skipped')
       uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
