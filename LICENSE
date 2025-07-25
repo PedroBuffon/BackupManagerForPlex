@@ -1,0 +1,42 @@
+MIT License
+
+Copyright (c) 2025 Pedro Buffon
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Plex Backup Manager"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+===============================================================================
+
+DISCLAIMER:
+
+This software is an independent third-party tool and is not affiliated with, 
+endorsed by, or sponsored by Plex, Inc. 
+
+"Plex" and "Plex Media Server" are trademarks of Plex, Inc. This software 
+interacts with Plex Media Server installations through standard file system 
+operations and publicly available interfaces, but does not redistribute, 
+modify, or reverse engineer any Plex, Inc. proprietary software.
+
+Users are responsible for ensuring their use of this software complies with 
+Plex, Inc.'s Terms of Service and any applicable licensing agreements.
+
+The authors of this software assume no responsibility for any data loss, 
+system damage, or violations of third-party terms of service that may result 
+from the use of this software.
+
+USE AT YOUR OWN RISK.
