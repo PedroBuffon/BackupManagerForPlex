@@ -5,7 +5,7 @@
 name: Plex Backup Manager Build
 
 env:
-  RELEASE_VERSION: "v1.2.0"
+  RELEASE_VERSION: "v1.2.1"
 
 on:
   push:
@@ -141,22 +141,9 @@ jobs:
         tag_name: ${{ env.RELEASE_VERSION }}
         name: ${{ env.RELEASE_VERSION }}
         body: |
-          
-          ### 🆕 New Features:
-          - **Backup Compression System**: Full ZIP compression support with configurable compression levels
-          
-          ### 🔧 Major Improvements:
-          - **Compression Performance Monitoring**: Real-time statistics showing compression ratios, speeds, and file processing
-          - **Extraction Progress Tracking**: Detailed progress reporting with file counts, data sizes, and processing speeds
-          - **Enhanced Restore Experience**: Live logging during restoration with extraction statistics and cleanup status
-          - **Improved Error Handling**: ObjectDisposedException fixes ensuring stable UI operations during restoration
-          - **Memory Management**: Proper disposal patterns preventing UI crashes during long operations
-          - **Backup Size Optimization**: Significant space savings through intelligent ZIP compression
-          
+
           ### 🎨 Interface Updates:
-          - **Compression Settings Dropdown**: User-friendly compression level selection in backup interface
-          - **Real-time Progress Display**: Dynamic progress bars and speed indicators during extraction
-          - **Improved Status Updates**: Detailed operation status with specific progress information
+          - **License Acceptance**: Added a license acceptance dialog on first run
           
           ### 📦 Available Packages:
           - **win-x64**: For 64-bit Windows systems (Recommended)
@@ -180,6 +167,13 @@ jobs:
           - Check `ROLLBACK.md` for rollback feature documentation
           - Report issues on GitHub with detailed logs (now includes compression statistics)
 
+          ### 📄 License:
+          - This project is licensed under the MIT License
+          - See `LICENSE` file included in the package for full terms
+          - Users must accept the license agreement on first application run
+          - Third-party tool - see `DISCLAIMER.md` for important legal information
+
+          
         files: |
           PlexBackup-win-x64.zip
           PlexBackup-win-x86.zip

@@ -45,6 +45,7 @@ namespace PlexBackupApp
         public bool AutoStartWithWindows { get; set; } = false;
         public string LogLevel { get; set; } = "Info"; // Debug, Info, Warning, Error
         public bool HasShownTrayNotification { get; set; } = false;
+        public bool HasAcceptedLicense { get; set; } = false;
         public bool EnableRollback { get; set; } = true;
         public int MaxRollbackAttempts { get; set; } = 3;
         public string CompressionType { get; set; } = "None"; // None, Zip, 7z, Gzip
@@ -269,6 +270,210 @@ namespace PlexBackupApp
         }
     }
 
+    // License Agreement Form
+    public partial class LicenseAgreementForm : Form
+    {
+        private RichTextBox txtLicense;
+        private Button btnAccept;
+        private Button btnDecline;
+        private CheckBox chkAgree;
+        
+        public bool LicenseAccepted { get; private set; } = false;
+        
+        public LicenseAgreementForm()
+        {
+            InitializeLicenseForm();
+        }
+        
+        private void InitializeLicenseForm()
+        {
+            // Form properties
+            Text = "License Agreement - Plex Backup Manager";
+            Size = new Size(700, 600);
+            StartPosition = FormStartPosition.CenterScreen;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            BackColor = SystemColors.Control;
+            ForeColor = SystemColors.ControlText;
+            
+            // Main container
+            var mainPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 4,
+                Padding = new Padding(20)
+            };
+            
+            // Row styles
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Title
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // License text
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Checkbox
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Buttons
+            
+            // Title label
+            var lblTitle = new Label
+            {
+                Text = "SOFTWARE LICENSE AGREEMENT",
+                Font = new Font("Arial", 14F, FontStyle.Bold),
+                ForeColor = SystemColors.ControlText,
+                AutoSize = true,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Margin = new Padding(0, 0, 0, 20)
+            };
+            
+            // License text box
+            txtLicense = new RichTextBox
+            {
+                ReadOnly = true,
+                BackColor = SystemColors.Window,
+                ForeColor = SystemColors.WindowText,
+                BorderStyle = BorderStyle.Fixed3D,
+                Dock = DockStyle.Fill,
+                Font = new Font("Consolas", 9F),
+                Margin = new Padding(0, 0, 0, 20)
+            };
+            
+            // Load license text
+            LoadLicenseText();
+            
+            // Agreement checkbox
+            chkAgree = new CheckBox
+            {
+                Text = "I have read and agree to the terms of this license agreement",
+                Font = new Font("Arial", 10F),
+                ForeColor = SystemColors.ControlText,
+                AutoSize = true,
+                Margin = new Padding(0, 0, 0, 20)
+            };
+            chkAgree.CheckedChanged += ChkAgree_CheckedChanged;
+            
+            // Button panel
+            var buttonPanel = new FlowLayoutPanel
+            {
+                FlowDirection = FlowDirection.RightToLeft,
+                AutoSize = true,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            
+            // Decline button
+            btnDecline = new Button
+            {
+                Text = "Decline",
+                Size = new Size(100, 35),
+                FlatStyle = FlatStyle.System,
+                DialogResult = DialogResult.Cancel,
+                Margin = new Padding(10, 0, 0, 0)
+            };
+            btnDecline.Click += BtnDecline_Click;
+            
+            // Accept button
+            btnAccept = new Button
+            {
+                Text = "Accept",
+                Size = new Size(100, 35),
+                FlatStyle = FlatStyle.System,
+                Enabled = false,
+                DialogResult = DialogResult.OK
+            };
+            btnAccept.Click += BtnAccept_Click;
+            
+            // Add buttons to panel
+            buttonPanel.Controls.Add(btnDecline);
+            buttonPanel.Controls.Add(btnAccept);
+            
+            // Add controls to main panel
+            mainPanel.Controls.Add(lblTitle, 0, 0);
+            mainPanel.Controls.Add(txtLicense, 0, 1);
+            mainPanel.Controls.Add(chkAgree, 0, 2);
+            mainPanel.Controls.Add(buttonPanel, 0, 3);
+            
+            Controls.Add(mainPanel);
+        }
+        
+        private void LoadLicenseText()
+        {
+            try
+            {
+                string licensePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "LICENSE");
+                if (File.Exists(licensePath))
+                {
+                    string licenseContent = File.ReadAllText(licensePath);
+                    txtLicense.Text = licenseContent;
+                }
+                else
+                {
+                    // Fallback license text
+                    txtLicense.Text = @"MIT License
+
+Copyright (c) 2025 Pedro Buffon
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the ""Plex Backup Manager""), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED ""AS IS"", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+===============================================================================
+
+DISCLAIMER:
+
+This software is an independent third-party tool and is not affiliated with, 
+endorsed by, or sponsored by Plex, Inc. 
+
+""Plex"" and ""Plex Media Server"" are trademarks of Plex, Inc. This software 
+interacts with Plex Media Server installations through standard file system 
+operations and publicly available interfaces, but does not redistribute, 
+modify, or reverse engineer any Plex, Inc. proprietary software.
+
+Users are responsible for ensuring their use of this software complies with 
+Plex, Inc.'s Terms of Service and any applicable licensing agreements.
+
+The authors of this software assume no responsibility for any data loss, 
+system damage, or violations of third-party terms of service that may result 
+from the use of this software.
+
+USE AT YOUR OWN RISK.";
+                }
+            }
+            catch (Exception ex)
+            {
+                txtLicense.Text = "Error loading license file: " + ex.Message + "\n\nPlease contact the developer for license information.";
+            }
+        }
+        
+        private void ChkAgree_CheckedChanged(object sender, EventArgs e)
+        {
+            btnAccept.Enabled = chkAgree.Checked;
+        }
+        
+        private void BtnAccept_Click(object sender, EventArgs e)
+        {
+            LicenseAccepted = true;
+            Close();
+        }
+        
+        private void BtnDecline_Click(object sender, EventArgs e)
+        {
+            LicenseAccepted = false;
+            Close();
+        }
+    }
+
     public partial class PlexBackupForm : Form
     {
         private PlexBackupConfig config;
@@ -306,6 +511,41 @@ namespace PlexBackupApp
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            
+            // Check if license has been accepted
+            string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
+            bool licenseAccepted = false;
+            
+            try
+            {
+                if (File.Exists(configPath))
+                {
+                    string configJson = File.ReadAllText(configPath);
+                    var tempConfig = JsonSerializer.Deserialize<PlexBackupConfig>(configJson);
+                    licenseAccepted = tempConfig?.HasAcceptedLicense ?? false;
+                }
+            }
+            catch
+            {
+                // If there's any error reading config, show license
+                licenseAccepted = false;
+            }
+            
+            // Show license agreement if not accepted
+            if (!licenseAccepted)
+            {
+                using (var licenseForm = new LicenseAgreementForm())
+                {
+                    if (licenseForm.ShowDialog() != DialogResult.OK || !licenseForm.LicenseAccepted)
+                    {
+                        // User declined license, exit application
+                        MessageBox.Show("You must accept the license agreement to use this software.", 
+                                      "License Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+                }
+            }
+            
             Application.Run(new PlexBackupForm());
         }
 
@@ -318,6 +558,13 @@ namespace PlexBackupApp
             InitializeComponent();
             InitializeSystemTray();
             LoadConfiguration();
+            
+            // Mark license as accepted (since we reach here only after license acceptance)
+            if (!config.HasAcceptedLicense)
+            {
+                config.HasAcceptedLicense = true;
+                SaveConfiguration();
+            }
         }
 
         private void InitializeComponent()
