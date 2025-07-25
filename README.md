@@ -13,11 +13,11 @@ A modern and complete Windows Forms application for backing up Plex Media Server
 ## 📋 Future Roadmap
 
 - [X] Restore functionality
-- [ ] Backup compression
+- [X] Backup compression
+- [ ] Dark/light theme
 - [ ] Complete scheduling implementation
 - [ ] Incremental backup
 - [ ] Cloud backup (OneDrive, Google Drive)
-- [ ] Dark/light theme
 
 ## 🚀 Features
 

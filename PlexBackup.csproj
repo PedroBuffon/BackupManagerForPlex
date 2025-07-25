@@ -17,4 +17,10 @@
     <Compile Remove="PlexBackup.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="resources\icon.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
