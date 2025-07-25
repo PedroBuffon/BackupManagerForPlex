@@ -16,8 +16,10 @@ A modern and complete Windows Forms application for backing up Plex Media Server
 - [X] Backup compression
 - [ ] Dark/light theme
 - [ ] Complete scheduling implementation
+- [ ] Retention Management
 - [ ] Incremental backup
 - [ ] Cloud backup (OneDrive, Google Drive)
+- [ ] Linux/Mac Support
 
 ## 🚀 Features
 
@@ -35,21 +37,14 @@ A modern and complete Windows Forms application for backing up Plex Media Server
 - ✅ **Include Previous Logs** - Optional to include old logs
 - ✅ **Stop Plex During Backup** - Control over service stopping
 
-### Retention Management (Still in Development)
-
-- **Automatic cleanup** of old backups
-- **Retention options**: 7, 14, 30, 60 days or never delete
-- **Automatic space saving**
-
 ### Extra Features
 
 - 🗂️ **View Backups** - Lists all existing backups with details
 - 📅 **Schedule Backup** - Interface to configure automatic backups
 - 🔄 **Restore Backup** - Restore functionality (in development)
 - ⚙️ **Advanced Settings** - Complete configuration management
-  - Custom Plex executable paths
   - Log level configuration (Debug, Info, Warning, Error)
-  - UI preferences (minimize to tray, notifications)
+  - UI preferences (minimize to tray)
   - Auto-start with Windows option
   - Backup statistics tracking
 
@@ -65,12 +60,12 @@ A modern and complete Windows Forms application for backing up Plex Media Server
 
 - .NET 9.0 or higher
 - Windows (for Windows Forms and Windows-specific commands)
-- Plex Media Server installed
+- Plex Media Server running on the same machine
 
 ## 📥 How to Build and Run
 
 1. **Clone or download** the project
-2. **Open PowerShell terminal** in the project folder
+2. **Open PowerShell terminal** in the project folder or execute the .exe file
 3. **Build**: `dotnet build`
 4. **Run**: `dotnet run`
 
