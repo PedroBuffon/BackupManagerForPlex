@@ -1,3 +1,11 @@
+/*
+ * Plex Backup Manager
+ * Copyright (c) 2025 Pedro Buffon
+ * Licensed under MIT License - see LICENSE file for details
+ * 
+ * This software is not affiliated with Plex, Inc.
+ */
+
 using System;
 using System.IO;
 using System.Diagnostics;
