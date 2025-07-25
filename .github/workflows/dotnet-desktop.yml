@@ -160,41 +160,32 @@ jobs:
         body: |
           
           ### 🆕 New Features:
-          - **Enhanced Interface**: Reorganized settings window with improved organization
-          - **Comprehensive Logging**: Advanced log viewer with syntax highlighting and copy functionality
-          - **Performance Optimization**: Improved restore speed with robocopy multi-threading (8 threads)
-          - **Smart Restore**: Dynamic progress calculation and timeout management (15 minutes)
-          - **Native Windows Theme**: Consistent system-native styling across all windows
-          - **Rollback System**: Automatic rollback when backup fails with configurable retry attempts
-          - **System Tray Integration**: Complete minimize to system tray functionality
-          - **JSON Configuration**: Modern configuration format with automatic migration
+          - **Backup Compression System**: Full ZIP compression support with configurable compression levels
           
           ### 🔧 Major Improvements:
-          - **Simplified Main Interface**: Moved backup options to organized settings window
-          - **Enhanced Restore Experience**: Custom completion dialogs with detailed log access
-          - **Better Error Handling**: Comprehensive error reporting and recovery
-          - **Settings Organization**: Clear categorization of backup, interface, rollback, and logging options
-          - **Removed Duplications**: Eliminated redundant interface elements for cleaner UX
-          - **File Management**: Robust file and registry backup processes with validation
-          - **Automatic Cleanup**: Smart retention policies for managing old backups
+          - **Compression Performance Monitoring**: Real-time statistics showing compression ratios, speeds, and file processing
+          - **Extraction Progress Tracking**: Detailed progress reporting with file counts, data sizes, and processing speeds
+          - **Enhanced Restore Experience**: Live logging during restoration with extraction statistics and cleanup status
+          - **Improved Error Handling**: ObjectDisposedException fixes ensuring stable UI operations during restoration
+          - **Memory Management**: Proper disposal patterns preventing UI crashes during long operations
+          - **Backup Size Optimization**: Significant space savings through intelligent ZIP compression
           
           ### 🎨 Interface Updates:
-          - **Clean Main Window**: Focused on essential actions (Backup, Schedule, Manage, Settings)
-          - **Organized Settings**: Grouped by Backup Options, Interface Settings, Rollback Settings, and Logging
-          - **Professional Styling**: Windows native theme for better system integration
-          - **Accessibility**: Proper color contrast and system font support
+          - **Compression Settings Dropdown**: User-friendly compression level selection in backup interface
+          - **Real-time Progress Display**: Dynamic progress bars and speed indicators during extraction
+          - **Improved Status Updates**: Detailed operation status with specific progress information
           
           ### 📦 Available Packages:
           - **win-x64**: For 64-bit Windows systems (Recommended)
           - **win-x86**: For 32-bit Windows systems  
           - **win-arm64**: For ARM64 Windows systems
-          
           ### 📋 Installation:
           1. Download the appropriate ZIP file for your system architecture
           2. Extract to your desired location
           3. Run `PlexBackup.exe`
           4. Configure your backup settings via the Settings button
-          5. Set your backup path and preferences
+          5. Choose your preferred compression level
+          6. Set your backup path and preferences
           
           ### ⚙️ System Requirements:
           - Windows 10/11 or Windows Server 2019+
@@ -204,7 +195,8 @@ jobs:
           ### 🆘 Support:
           - Check `README.md` for basic usage instructions
           - Check `ROLLBACK.md` for rollback feature documentation
-          - Report issues on GitHub with detailed logs
+          - Report issues on GitHub with detailed logs (now includes compression statistics)
+
         files: |
           PlexBackup-win-x64.zip
           PlexBackup-win-x86.zip
