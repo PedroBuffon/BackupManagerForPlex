@@ -172,3 +172,11 @@ BackupPath/
 
 To use as a scheduled task, compile the project and use the generated .exe file:
 `PlexBackup.exe`
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Disclaimer
+
+This is an independent third-party tool. See [DISCLAIMER](DISCLAIMER.md) for important legal information.
