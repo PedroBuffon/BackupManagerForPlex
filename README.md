@@ -2,7 +2,12 @@
 
 > [!WARNING]
 > This is app is still in development and bugs/errors can occur middle run.
+> 
 > Use it at your own risk.
+>
+> THIS APP IS DEVELOP TO BACKUP THE DATABASE AND NOT MEDIA FILES
+> 
+> MEDIA FILES ARE MANAGED BY THE USER AND THIS APP WILL NEVER TOUCH THOSE FILES
 
 <div id="header" align="center">
   <img src="resources/icon.png" width="180"/>
