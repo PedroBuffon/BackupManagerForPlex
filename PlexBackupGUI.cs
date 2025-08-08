@@ -1,5 +1,5 @@
 /*
- * Plex Backup Manager
+ * Backup Manager For Plex
  * Copyright (c) 2025 Pedro Buffon
  * Licensed under MIT License - see LICENSE file for details
  * 
@@ -288,7 +288,7 @@ namespace PlexBackupApp
         private void InitializeLicenseForm()
         {
             // Form properties
-            Text = "License Agreement - Plex Backup Manager";
+            Text = "License Agreement - Backup Manager For Plex";
             Size = new Size(700, 600);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -412,7 +412,7 @@ namespace PlexBackupApp
 Copyright (c) 2025 Pedro Buffon
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the ""Plex Backup Manager""), to deal
+of this software and associated documentation files (the ""Backup Manager For Plex""), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
@@ -578,7 +578,7 @@ USE AT YOUR OWN RISK.";
 
         private void InitializeComponent()
         {
-            this.Text = "Plex Backup Manager v1.0.0";
+            this.Text = "Backup Manager For Plex v1.2.1";
             this.Size = new Size(800, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -603,7 +603,7 @@ USE AT YOUR OWN RISK.";
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 9,
+                RowCount = 10,
                 Padding = new Padding(10)
             };
 
@@ -612,7 +612,7 @@ USE AT YOUR OWN RISK.";
             mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70F));
 
             // Row styles
-            for (int i = 0; i < 9; i++)
+            for (int i = 0; i < 10; i++)
             {
                 mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             }
@@ -622,24 +622,33 @@ USE AT YOUR OWN RISK.";
             {
                 Text = "Backup Path:",
                 AutoSize = true,
-                Anchor = AnchorStyles.Left,
-                Font = new Font("Arial", 10F, FontStyle.Bold)
+                Anchor = AnchorStyles.Left | AnchorStyles.Top,
+                Font = new Font("Arial", 10F, FontStyle.Bold),
+                ForeColor = SystemColors.ControlText,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Margin = new Padding(0, 5, 0, 5)
             };
 
-            var pathPanel = new Panel { Height = 35, Dock = DockStyle.Fill };
+            var pathPanel = new Panel { 
+                Height = 35, 
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 5, 0, 5)
+            };
             txtBackupPath = new TextBox
             {
                 Width = 400,
-                Height = 25,
-                Anchor = AnchorStyles.Left | AnchorStyles.Top
+                Height = 23,
+                Anchor = AnchorStyles.Left | AnchorStyles.Top,
+                Top = 6
             };
 
             btnBrowse = new Button
             {
                 Text = "Browse...",
                 Width = 80,
-                Height = 25,
-                Location = new Point(410, 0)
+                Height = 23,
+                Location = new Point(410, 6),
+                UseVisualStyleBackColor = true
             };
             btnBrowse.Click += BtnBrowse_Click;
 
@@ -651,17 +660,22 @@ USE AT YOUR OWN RISK.";
             {
                 Text = "Keep Backups For:",
                 AutoSize = true,
-                Anchor = AnchorStyles.Left,
+                Anchor = AnchorStyles.Left | AnchorStyles.Top,
                 Font = new Font("Arial", 10F, FontStyle.Bold),
-                ForeColor = SystemColors.ControlText
+                ForeColor = SystemColors.ControlText,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Margin = new Padding(0, 5, 0, 5)
             };
 
             cmbRetentionDays = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Width = 200,
+                Height = 23,
                 BackColor = SystemColors.Window,
-                ForeColor = SystemColors.WindowText
+                ForeColor = SystemColors.WindowText,
+                Anchor = AnchorStyles.Left | AnchorStyles.Top,
+                Margin = new Padding(0, 5, 0, 5)
             };
             cmbRetentionDays.Items.AddRange(new string[] { "7 days", "14 days", "30 days", "60 days", "Never delete" });
             cmbRetentionDays.SelectedIndex = 2; // 30 days default
@@ -671,17 +685,22 @@ USE AT YOUR OWN RISK.";
             {
                 Text = "Compression:",
                 AutoSize = true,
-                Anchor = AnchorStyles.Left,
+                Anchor = AnchorStyles.Left | AnchorStyles.Top,
                 Font = new Font("Arial", 10F, FontStyle.Bold),
-                ForeColor = SystemColors.ControlText
+                ForeColor = SystemColors.ControlText,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Margin = new Padding(0, 5, 0, 5)
             };
 
             cmbCompressionType = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Width = 200,
+                Height = 23,
                 BackColor = SystemColors.Window,
-                ForeColor = SystemColors.WindowText
+                ForeColor = SystemColors.WindowText,
+                Anchor = AnchorStyles.Left | AnchorStyles.Top,
+                Margin = new Padding(0, 5, 0, 5)
             };
             cmbCompressionType.Items.AddRange(new string[] { 
                 "None (No compression)", 
@@ -696,7 +715,10 @@ USE AT YOUR OWN RISK.";
             {
                 FlowDirection = FlowDirection.LeftToRight,
                 Height = 40,
-                Dock = DockStyle.Fill
+                Dock = DockStyle.Fill,
+                WrapContents = false,
+                AutoSize = false,
+                Margin = new Padding(0, 5, 0, 5)
             };
 
             btnBackupNow = new Button
@@ -704,7 +726,9 @@ USE AT YOUR OWN RISK.";
                 Text = "Backup Now",
                 Width = 100,
                 Height = 35,
-                BackColor = Color.LightGreen
+                BackColor = Color.LightGreen,
+                Margin = new Padding(0, 0, 5, 0),
+                UseVisualStyleBackColor = false
             };
             btnBackupNow.Click += BtnBackupNow_Click;
 
@@ -713,7 +737,9 @@ USE AT YOUR OWN RISK.";
                 Text = "Schedule Backup",
                 Width = 120,
                 Height = 35,
-                BackColor = Color.LightBlue
+                BackColor = Color.LightBlue,
+                Margin = new Padding(0, 0, 5, 0),
+                UseVisualStyleBackColor = false
             };
             btnScheduleBackup.Click += BtnScheduleBackup_Click;
 
@@ -721,7 +747,9 @@ USE AT YOUR OWN RISK.";
             {
                 Text = "Manage Backups",
                 Width = 120,
-                Height = 35
+                Height = 35,
+                Margin = new Padding(0, 0, 5, 0),
+                UseVisualStyleBackColor = true
             };
             btnViewBackups.Click += BtnViewBackups_Click;
 
@@ -729,7 +757,9 @@ USE AT YOUR OWN RISK.";
             {
                 Text = "Settings",
                 Width = 80,
-                Height = 35
+                Height = 35,
+                Margin = new Padding(0, 0, 0, 0),
+                UseVisualStyleBackColor = true
             };
             btnSettings.Click += BtnSettings_Click;
 
@@ -748,8 +778,10 @@ USE AT YOUR OWN RISK.";
             {
                 Text = "Ready",
                 AutoSize = true,
-                Anchor = AnchorStyles.Left,
-                Font = new Font("Arial", 9F, FontStyle.Italic)
+                Anchor = AnchorStyles.Left | AnchorStyles.Top,
+                Font = new Font("Arial", 9F, FontStyle.Italic),
+                ForeColor = SystemColors.ControlText,
+                Margin = new Padding(0, 15, 0, 5)
             };
 
             // Log Section
@@ -757,13 +789,15 @@ USE AT YOUR OWN RISK.";
             {
                 Text = "Operation Log:",
                 AutoSize = true,
-                Anchor = AnchorStyles.Left,
-                Font = new Font("Arial", 10F, FontStyle.Bold)
+                Anchor = AnchorStyles.Left | AnchorStyles.Top,
+                Font = new Font("Arial", 10F, FontStyle.Bold),
+                ForeColor = SystemColors.ControlText,
+                Margin = new Padding(0, 5, 0, 5)
             };
 
             txtLog = new RichTextBox
             {
-                Height = 200,
+                Height = 400,
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
                 BackColor = Color.Black,
@@ -778,8 +812,21 @@ USE AT YOUR OWN RISK.";
             mainPanel.Controls.Add(cmbRetentionDays, 1, 1);
             mainPanel.Controls.Add(lblCompression, 0, 2);
             mainPanel.Controls.Add(cmbCompressionType, 1, 2);
-            mainPanel.Controls.Add(new Label { Text = "Actions:", AutoSize = true, Font = new Font("Arial", 10F, FontStyle.Bold), ForeColor = SystemColors.ControlText }, 0, 3);
+            mainPanel.Controls.Add(new Label { 
+                Text = "Actions:", 
+                AutoSize = true, 
+                Font = new Font("Arial", 10F, FontStyle.Bold), 
+                ForeColor = SystemColors.ControlText,
+                Anchor = AnchorStyles.Left | AnchorStyles.Top,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Margin = new Padding(0, 15, 0, 5)
+            }, 0, 3);
             mainPanel.Controls.Add(btnPanel, 1, 3);
+            
+            // Add some spacing before progress bar
+            mainPanel.Controls.Add(new Label { Text = "", Height = 10 }, 0, 4);
+            mainPanel.SetColumnSpan(mainPanel.Controls[mainPanel.Controls.Count - 1], 2);
+            
             mainPanel.Controls.Add(progressBar, 0, 5);
             mainPanel.SetColumnSpan(progressBar, 2);
             mainPanel.Controls.Add(lblStatus, 0, 6);
@@ -795,7 +842,7 @@ USE AT YOUR OWN RISK.";
             cmbCompressionType.SelectedIndexChanged += CmbCompressionType_SelectedIndexChanged;
 
             // Add welcome message to log
-            LogMessage("Plex Backup Manager v1.0.0 - Ready for operation", Color.White);
+            LogMessage("Backup Manager For Plex v1.2.1 - Ready for operation", Color.White);
         }
 
         private void InitializeSystemTray()
@@ -803,7 +850,7 @@ USE AT YOUR OWN RISK.";
             // Create context menu for system tray
             trayContextMenu = new ContextMenuStrip();
             
-            trayShowItem = new ToolStripMenuItem("Show Plex Backup Manager");
+            trayShowItem = new ToolStripMenuItem("Show Backup Manager For Plex");
             trayShowItem.Click += TrayShowItem_Click;
             trayShowItem.Font = new Font(trayShowItem.Font, FontStyle.Bold);
             
@@ -832,7 +879,7 @@ USE AT YOUR OWN RISK.";
                 // Use default system icon if custom icon fails to load
                 notifyIcon.Icon = SystemIcons.Application;
             }
-            notifyIcon.Text = "Plex Backup Manager";
+            notifyIcon.Text = "Backup Manager For Plex";
             notifyIcon.ContextMenuStrip = trayContextMenu;
             notifyIcon.DoubleClick += NotifyIcon_DoubleClick;
             
@@ -1051,7 +1098,7 @@ USE AT YOUR OWN RISK.";
         {
             if (config.ShowNotifications && notifyIcon.Visible)
             {
-                notifyIcon.ShowBalloonTip(3000, "Plex Backup Manager", message, icon);
+                notifyIcon.ShowBalloonTip(3000, "Backup Manager For Plex", message, icon);
             }
         }
 

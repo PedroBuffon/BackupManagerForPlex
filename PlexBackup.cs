@@ -1,5 +1,5 @@
 /*
- * Plex Backup Manager
+ * Backup Manager For Plex
  * Copyright (c) 2025 Pedro Buffon
  * Licensed under MIT License - see LICENSE file for details
  * 
@@ -68,7 +68,7 @@ namespace PlexBackupApp
 
         private void InitializeComponent()
         {
-            this.Text = "Plex Backup Manager v1.0.0";
+            this.Text = "Backup Manager For Plex v1.2.1";
             this.Size = new Size(800, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -273,8 +273,10 @@ namespace PlexBackupApp
             this.Controls.Add(mainPanel);
 
             // Add welcome message to log
-            LogMessage("Plex Backup Manager v1.0.0 - Ready for operation", Color.White);
+            LogMessage("Backup Manager For Plex v1.2.1 - Ready for operation", Color.White);
         }
+
+        private void PerformPlexBackup()
         {
             try
             {

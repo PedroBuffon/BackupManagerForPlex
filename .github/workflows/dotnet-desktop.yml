@@ -1,8 +1,8 @@
-# Plex Backup Manager - CI/CD Pipeline
-# This workflow builds and tests the Plex Backup Manager Windows Forms application
+# Backup Manager For Plex - CI/CD Pipeline
+# This workflow builds and tests the Backup Manager For Plex Windows Forms application
 # Built on .NET 9.0 with Windows Forms support
 
-name: Plex Backup Manager Build
+name: Backup Manager For Plex Build
 
 env:
   RELEASE_VERSION: "v1.2.1"
