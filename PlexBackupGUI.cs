@@ -578,7 +578,7 @@ USE AT YOUR OWN RISK.";
 
         private void InitializeComponent()
         {
-            this.Text = "Backup Manager For Plex v1.2.1";
+            this.Text = "Backup Manager For Plex v1.2.5";
             this.Size = new Size(800, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -842,7 +842,7 @@ USE AT YOUR OWN RISK.";
             cmbCompressionType.SelectedIndexChanged += CmbCompressionType_SelectedIndexChanged;
 
             // Add welcome message to log
-            LogMessage("Backup Manager For Plex v1.2.1 - Ready for operation", Color.White);
+            LogMessage("Backup Manager For Plex v1.2.5 - Ready for operation", Color.White);
         }
 
         private void InitializeSystemTray()

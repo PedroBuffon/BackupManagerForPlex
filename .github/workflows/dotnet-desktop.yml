@@ -5,7 +5,7 @@
 name: Backup Manager For Plex Build
 
 env:
-  RELEASE_VERSION: "v1.2.1"
+  RELEASE_VERSION: "v1.2.5"
 
 on:
   push:
@@ -142,9 +142,13 @@ jobs:
         name: ${{ env.RELEASE_VERSION }}
         body: |
 
-          ### 🎨 Interface Updates:
-          - **License Acceptance**: Added a license acceptance dialog on first run
-          
+          ### 🎨 New Name:
+          - **Now the program is called Backup Manager For Plex**
+
+          ### Fixes:
+          - **Fix**: License acceptance dialog always appearing when running, not only once
+          - **Fix**: Bugs and performance issues
+
           ### 📦 Available Packages:
           - **win-x64**: For 64-bit Windows systems (Recommended)
           - **win-x86**: For 32-bit Windows systems  
