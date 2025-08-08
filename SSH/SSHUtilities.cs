@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Renci.SshNet;
+using Renci.SshNet.Common;
 
 namespace PlexBackupApp
 {
@@ -8,21 +10,12 @@ namespace PlexBackupApp
     {
         public static bool IsSSHAvailable()
         {
+            // SSH.NET is available if the library is loaded
+            // We can test this by trying to create a connection info object
             try
             {
-                ProcessStartInfo psi = new ProcessStartInfo();
-                psi.FileName = "ssh";
-                psi.Arguments = "-V";
-                psi.UseShellExecute = false;
-                psi.RedirectStandardOutput = true;
-                psi.RedirectStandardError = true;
-                psi.CreateNoWindow = true;
-
-                using (Process process = Process.Start(psi))
-                {
-                    process.WaitForExit(5000);
-                    return process.ExitCode == 0 || !string.IsNullOrEmpty(process.StandardError.ReadToEnd());
-                }
+                var connectionInfo = new ConnectionInfo("test", "test", new PasswordAuthenticationMethod("test", "test"));
+                return true;
             }
             catch
             {
@@ -32,26 +25,8 @@ namespace PlexBackupApp
 
         public static bool IsSCPAvailable()
         {
-            try
-            {
-                ProcessStartInfo psi = new ProcessStartInfo();
-                psi.FileName = "scp";
-                psi.Arguments = "";
-                psi.UseShellExecute = false;
-                psi.RedirectStandardOutput = true;
-                psi.RedirectStandardError = true;
-                psi.CreateNoWindow = true;
-
-                using (Process process = Process.Start(psi))
-                {
-                    process.WaitForExit(2000);
-                    return true; // SCP typically returns error when no args, but that means it's available
-                }
-            }
-            catch
-            {
-                return false;
-            }
+            // SCP functionality is built into SSH.NET
+            return IsSSHAvailable();
         }
 
         public static string GetSSHRequirementsMessage()
@@ -60,25 +35,76 @@ namespace PlexBackupApp
             
             if (!IsSSHAvailable())
             {
-                requirements.Add("• SSH client is not available. Please install OpenSSH client.");
-            }
-            
-            if (!IsSCPAvailable())
-            {
-                requirements.Add("• SCP client is not available. Please install OpenSSH client.");
+                requirements.Add("• SSH.NET library is not available or not properly installed.");
             }
 
             if (requirements.Count > 0)
             {
                 return "Missing requirements for SSH restore:\n\n" + string.Join("\n", requirements) + 
-                       "\n\nTo install OpenSSH on Windows:\n" +
-                       "1. Open Settings > Apps > Optional Features\n" +
-                       "2. Click 'Add a feature'\n" +
-                       "3. Find and install 'OpenSSH Client'\n" +
-                       "4. Restart the application";
+                       "\n\nSSH.NET library should be automatically included with this application.\n" +
+                       "If you see this message, please reinstall the application.";
             }
 
             return "";
+        }
+
+        public static bool TestSSHConnection(SSHConnectionConfig config, out string errorMessage)
+        {
+            errorMessage = "";
+            
+            try
+            {
+                AuthenticationMethod authMethod;
+                
+                if (config.UsePrivateKey && !string.IsNullOrEmpty(config.PrivateKeyPath))
+                {
+                    if (!System.IO.File.Exists(config.PrivateKeyPath))
+                    {
+                        errorMessage = "Private key file not found.";
+                        return false;
+                    }
+                    
+                    var keyFile = new PrivateKeyFile(config.PrivateKeyPath, config.Password);
+                    authMethod = new PrivateKeyAuthenticationMethod(config.Username, keyFile);
+                }
+                else
+                {
+                    authMethod = new PasswordAuthenticationMethod(config.Username, config.Password);
+                }
+
+                var connectionInfo = new ConnectionInfo(config.HostIP, config.Port, config.Username, authMethod);
+                
+                using (var client = new SshClient(connectionInfo))
+                {
+                    client.Connect();
+                    
+                    if (client.IsConnected)
+                    {
+                        client.Disconnect();
+                        return true;
+                    }
+                    else
+                    {
+                        errorMessage = "Failed to establish SSH connection.";
+                        return false;
+                    }
+                }
+            }
+            catch (SshAuthenticationException ex)
+            {
+                errorMessage = $"Authentication failed: {ex.Message}";
+                return false;
+            }
+            catch (SshConnectionException ex)
+            {
+                errorMessage = $"Connection failed: {ex.Message}";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"SSH connection error: {ex.Message}";
+                return false;
+            }
         }
     }
 }

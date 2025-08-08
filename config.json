@@ -12,5 +12,11 @@
   "minimizeToTray": false,
   "showNotifications": true,
   "autoStartWithWindows": false,
-  "logLevel": "Info"
+  "logLevel": "Info",
+  "hasShownTrayNotification": false,
+  "hasAcceptedLicense": false,
+  "enableRollback": true,
+  "maxRollbackAttempts": 3,
+  "compressionType": "None",
+  "compressionLevel": 6
 }

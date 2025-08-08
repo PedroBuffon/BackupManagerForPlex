@@ -8,6 +8,7 @@
 
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 using System.Diagnostics;
 using System.Windows.Forms;
@@ -15,6 +16,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
+using Renci.SshNet;
+using Renci.SshNet.Common;
 
 namespace PlexBackupApp
 {
@@ -421,8 +424,16 @@ namespace PlexBackupApp
             {
                 try
                 {
-                    // Test basic SSH connection using built-in Windows SSH client
-                    return TestSSHConnectionInternal();
+                    // Test SSH connection using SSH.NET
+                    string errorMessage;
+                    bool success = SSHRestoreUtilities.TestSSHConnection(sshConfig, out errorMessage);
+                    
+                    if (!success)
+                    {
+                        LogProgress($"SSH test failed: {errorMessage}", Color.Red);
+                    }
+                    
+                    return success;
                 }
                 catch (Exception ex)
                 {
@@ -430,56 +441,6 @@ namespace PlexBackupApp
                     return false;
                 }
             });
-        }
-
-        private bool TestSSHConnectionInternal()
-        {
-            try
-            {
-                string sshCommand;
-                ProcessStartInfo psi = new ProcessStartInfo();
-                
-                if (sshConfig.UsePrivateKey)
-                {
-                    // Using private key authentication
-                    sshCommand = $"ssh -i \"{sshConfig.PrivateKeyPath}\" -p {sshConfig.Port} -o ConnectTimeout=10 -o StrictHostKeyChecking=no {sshConfig.Username}@{sshConfig.HostIP} \"echo 'Connection successful'\"";
-                }
-                else
-                {
-                    // Using password authentication with sshpass (if available) or expect
-                    // For Windows, we'll use a different approach with plink if available
-                    sshCommand = $"ssh -p {sshConfig.Port} -o ConnectTimeout=10 -o StrictHostKeyChecking=no {sshConfig.Username}@{sshConfig.HostIP} \"echo 'Connection successful'\"";
-                }
-
-                psi.FileName = "ssh";
-                psi.Arguments = $"-p {sshConfig.Port} -o ConnectTimeout=10 -o StrictHostKeyChecking=no {sshConfig.Username}@{sshConfig.HostIP} \"echo 'Connection successful'\"";
-                psi.UseShellExecute = false;
-                psi.RedirectStandardOutput = true;
-                psi.RedirectStandardError = true;
-                psi.CreateNoWindow = true;
-
-                using (Process process = Process.Start(psi))
-                {
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit(15000); // 15 second timeout
-
-                    if (process.ExitCode == 0 && output.Contains("Connection successful"))
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        LogProgress($"SSH test failed: {error}", Color.Red);
-                        return false;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                LogProgress($"SSH connection test error: {ex.Message}", Color.Red);
-                return false;
-            }
         }
 
         private async Task PerformSSHRestore()
@@ -561,7 +522,7 @@ namespace PlexBackupApp
                 
                 try
                 {
-                    System.IO.Compression.ZipFile.CreateFromDirectory(sourceBackupPath, tempZipPath);
+                    ZipFile.CreateFromDirectory(sourceBackupPath, tempZipPath);
                     LogProgress("Backup compression completed", Color.LightGreen);
                     return tempZipPath;
                 }
@@ -579,42 +540,31 @@ namespace PlexBackupApp
             LogProgress($"Created temporary directory: {sshConfig.TempRestorePath}", Color.LightGreen);
         }
 
-        private void TransferBackupToRemote(string localBackupPath)
+        private string DetectPlexServiceName()
         {
-            string remoteBackupPath = $"{sshConfig.TempRestorePath}/backup.zip";
+            string[] possibleServices = { "plexmediaserver", "plex", "pms" };
             
-            try
+            foreach (string serviceName in possibleServices)
             {
-                ProcessStartInfo psi = new ProcessStartInfo();
-                psi.FileName = "scp";
-                psi.Arguments = $"-P {sshConfig.Port} -o StrictHostKeyChecking=no \"{localBackupPath}\" {sshConfig.Username}@{sshConfig.HostIP}:{remoteBackupPath}";
-                psi.UseShellExecute = false;
-                psi.RedirectStandardOutput = true;
-                psi.RedirectStandardError = true;
-                psi.CreateNoWindow = true;
-
-                using (Process process = Process.Start(psi))
+                try
                 {
-                    process.WaitForExit(300000); // 5 minute timeout for transfer
-                    
-                    if (process.ExitCode != 0)
-                    {
-                        string error = process.StandardError.ReadToEnd();
-                        throw new Exception($"SCP transfer failed: {error}");
-                    }
+                    ExecuteRemoteCommand($"systemctl is-active {serviceName} || systemctl is-enabled {serviceName}", "Service check", allowFailure: true);
+                    return serviceName; // If no exception, this service exists
                 }
-                
-                LogProgress("Backup transfer completed successfully", Color.LightGreen);
+                catch
+                {
+                    continue; // Try next service name
+                }
             }
-            catch (Exception ex)
-            {
-                throw new Exception($"Failed to transfer backup: {ex.Message}");
-            }
+            
+            // Fallback to configured service name
+            return sshConfig.PlexServiceName;
         }
 
         private void StopRemotePlexService()
         {
-            string command = $"sudo systemctl stop {sshConfig.PlexServiceName}";
+            string serviceName = DetectPlexServiceName();
+            string command = $"sudo systemctl stop {serviceName}";
             ExecuteRemoteCommand(command, "Failed to stop Plex service", allowFailure: true);
             
             // Wait a moment for service to stop
@@ -624,7 +574,8 @@ namespace PlexBackupApp
 
         private void StartRemotePlexService()
         {
-            string command = $"sudo systemctl start {sshConfig.PlexServiceName}";
+            string serviceName = DetectPlexServiceName();
+            string command = $"sudo systemctl start {serviceName}";
             ExecuteRemoteCommand(command, "Failed to start Plex service", allowFailure: true);
             
             LogProgress("Plex service started", Color.LightGreen);
@@ -642,15 +593,18 @@ namespace PlexBackupApp
             ExecuteRemoteCommand($"cd {extractPath} && unzip -q {tempBackupPath}", "Failed to extract backup");
             LogProgress("Backup extracted successfully", Color.LightGreen);
             
-            // Create backup of current Plex data
+            // Create backup of current Plex data (if it exists)
             string backupTimestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string currentBackupPath = $"{sshConfig.TempRestorePath}/current_backup_{backupTimestamp}";
             ExecuteRemoteCommand($"mkdir -p {currentBackupPath}", "Failed to create current backup directory");
-            ExecuteRemoteCommand($"cp -r \"{sshConfig.PlexDataPath}\" {currentBackupPath}/", "Failed to backup current Plex data", allowFailure: true);
+            
+            // Check if Plex data path exists before backing up
+            ExecuteRemoteCommand($"test -d \"{sshConfig.PlexDataPath}\" && cp -r \"{sshConfig.PlexDataPath}\" {currentBackupPath}/ || echo 'No existing Plex data to backup'", "Failed to backup current Plex data", allowFailure: true);
             LogProgress("Current Plex data backed up", Color.LightGreen);
             
-            // Remove current Plex data (be very careful here)
-            ExecuteRemoteCommand($"rm -rf \"{sshConfig.PlexDataPath}\"/*", "Failed to clear current Plex data");
+            // Create Plex data directory if it doesn't exist, then clear it
+            ExecuteRemoteCommand($"sudo mkdir -p \"{sshConfig.PlexDataPath}\"", "Failed to create Plex data directory", allowFailure: true);
+            ExecuteRemoteCommand($"sudo rm -rf \"{sshConfig.PlexDataPath}\"/*", "Failed to clear current Plex data", allowFailure: true);
             LogProgress("Current Plex data cleared", Color.Yellow);
             
             // Copy restored data
@@ -659,8 +613,25 @@ namespace PlexBackupApp
             ExecuteRemoteCommand(copyCommand, "Failed to restore Plex data");
             LogProgress("Plex data restored successfully", Color.LightGreen);
             
-            // Set proper permissions
-            ExecuteRemoteCommand($"chown -R plex:plex \"{sshConfig.PlexDataPath}\"", "Failed to set permissions", allowFailure: true);
+            // Set proper permissions - try to detect the correct user
+            // First try common Plex users
+            string[] plexUsers = { "plex", "plexmediaserver", "pms" };
+            bool permissionsSet = false;
+            
+            foreach (string user in plexUsers)
+            {
+                ExecuteRemoteCommand($"id {user}", "User check", allowFailure: true);
+                ExecuteRemoteCommand($"sudo chown -R {user}:{user} \"{sshConfig.PlexDataPath}\"", $"Failed to set permissions for {user}", allowFailure: true);
+                permissionsSet = true;
+                break; // If we get here without exception, it worked
+            }
+            
+            if (!permissionsSet)
+            {
+                // Fallback to current user
+                ExecuteRemoteCommand($"sudo chown -R $USER:$USER \"{sshConfig.PlexDataPath}\"", "Failed to set fallback permissions", allowFailure: true);
+            }
+            
             LogProgress("Permissions updated", Color.LightGreen);
         }
 
@@ -670,33 +641,106 @@ namespace PlexBackupApp
             LogProgress("Temporary files cleaned up", Color.LightGreen);
         }
 
+        private ConnectionInfo CreateConnectionInfo()
+        {
+            AuthenticationMethod authMethod;
+            
+            if (sshConfig.UsePrivateKey && !string.IsNullOrEmpty(sshConfig.PrivateKeyPath))
+            {
+                var keyFile = new PrivateKeyFile(sshConfig.PrivateKeyPath, sshConfig.Password);
+                authMethod = new PrivateKeyAuthenticationMethod(sshConfig.Username, keyFile);
+            }
+            else
+            {
+                authMethod = new PasswordAuthenticationMethod(sshConfig.Username, sshConfig.Password);
+            }
+
+            return new ConnectionInfo(sshConfig.HostIP, sshConfig.Port, sshConfig.Username, authMethod);
+        }
+
+        private void TransferBackupToRemote(string localBackupPath)
+        {
+            string remoteBackupPath = $"{sshConfig.TempRestorePath}/backup.zip";
+            
+            try
+            {
+                var connectionInfo = CreateConnectionInfo();
+                
+                using (var scpClient = new ScpClient(connectionInfo))
+                {
+                    scpClient.Connect();
+                    
+                    LogProgress("Starting backup file transfer...", Color.Yellow);
+                    
+                    var fileInfo = new FileInfo(localBackupPath);
+                    long totalBytes = fileInfo.Length;
+                    long uploadedBytes = 0;
+                    
+                    scpClient.Uploading += (sender, e) =>
+                    {
+                        uploadedBytes = e.Uploaded;
+                        int progressPercent = (int)((uploadedBytes * 100) / totalBytes);
+                        
+                        // Update progress on UI thread
+                        if (progressBar.InvokeRequired)
+                        {
+                            progressBar.Invoke((Action)(() => {
+                                progressBar.Value = Math.Min(progressPercent, 100);
+                            }));
+                        }
+                    };
+                    
+                    scpClient.Upload(fileInfo, remoteBackupPath);
+                    scpClient.Disconnect();
+                }
+                
+                LogProgress("Backup transfer completed successfully", Color.LightGreen);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to transfer backup: {ex.Message}");
+            }
+        }
+
         private void ExecuteRemoteCommand(string command, string errorMessage, bool allowFailure = false)
         {
             try
             {
-                ProcessStartInfo psi = new ProcessStartInfo();
-                psi.FileName = "ssh";
-                psi.Arguments = $"-p {sshConfig.Port} -o StrictHostKeyChecking=no {sshConfig.Username}@{sshConfig.HostIP} \"{command}\"";
-                psi.UseShellExecute = false;
-                psi.RedirectStandardOutput = true;
-                psi.RedirectStandardError = true;
-                psi.CreateNoWindow = true;
-
-                using (Process process = Process.Start(psi))
+                var connectionInfo = CreateConnectionInfo();
+                
+                using (var sshClient = new SshClient(connectionInfo))
                 {
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit(60000); // 1 minute timeout
+                    sshClient.Connect();
                     
-                    if (process.ExitCode != 0 && !allowFailure)
+                    // Handle sudo commands by providing password via echo
+                    if (command.StartsWith("sudo ") && !string.IsNullOrEmpty(sshConfig.Password))
                     {
-                        throw new Exception($"{errorMessage}: {error}");
+                        command = $"echo '{sshConfig.Password}' | sudo -S {command.Substring(5)}";
                     }
                     
-                    if (!string.IsNullOrEmpty(output))
+                    using (var cmd = sshClient.CreateCommand(command))
                     {
-                        LogProgress($"Command output: {output.Trim()}", Color.LightBlue);
+                        cmd.CommandTimeout = TimeSpan.FromMinutes(1);
+                        string result = cmd.Execute();
+                        
+                        if (cmd.ExitStatus != 0 && !allowFailure)
+                        {
+                            string error = cmd.Error;
+                            throw new Exception($"{errorMessage}: {error}");
+                        }
+                        
+                        if (!string.IsNullOrEmpty(result))
+                        {
+                            LogProgress($"Command output: {result.Trim()}", Color.LightBlue);
+                        }
+                        
+                        if (!string.IsNullOrEmpty(cmd.Error) && allowFailure)
+                        {
+                            LogProgress($"Command warning: {cmd.Error.Trim()}", Color.Orange);
+                        }
                     }
+                    
+                    sshClient.Disconnect();
                 }
             }
             catch (Exception ex)
