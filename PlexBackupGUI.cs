@@ -376,7 +376,8 @@ namespace PlexBackupApp
                 Size = new Size(100, 35),
                 FlatStyle = FlatStyle.System,
                 Enabled = false,
-                DialogResult = DialogResult.OK
+                DialogResult = DialogResult.OK,
+                Margin = new Padding(10, 0, 0, 0)
             };
             btnAccept.Click += BtnAccept_Click;
             
@@ -521,8 +522,17 @@ USE AT YOUR OWN RISK.";
                 if (File.Exists(configPath))
                 {
                     string configJson = File.ReadAllText(configPath);
-                    var tempConfig = JsonSerializer.Deserialize<PlexBackupConfig>(configJson);
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        WriteIndented = true
+                    };
+                    var tempConfig = JsonSerializer.Deserialize<PlexBackupConfig>(configJson, options);
                     licenseAccepted = tempConfig?.HasAcceptedLicense ?? false;
+                }
+                else
+                {
+                    licenseAccepted = false;
                 }
             }
             catch
@@ -553,7 +563,6 @@ USE AT YOUR OWN RISK.";
         {
             // Initialize configuration paths
             configJsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
-            config = new PlexBackupConfig();
             
             InitializeComponent();
             InitializeSystemTray();
