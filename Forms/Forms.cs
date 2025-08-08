@@ -240,6 +240,7 @@ namespace PlexBackupApp
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
+            ShowInTaskbar = false;
             BackColor = SystemColors.Control;
             ForeColor = SystemColors.ControlText;
             
@@ -429,6 +430,10 @@ USE AT YOUR OWN RISK.";
             this.Text = "Schedule Backup";
             this.Size = new Size(400, 300);
             this.StartPosition = FormStartPosition.CenterParent;
+            this.ShowInTaskbar = false;
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
             
             var label = new Label
             {
@@ -463,6 +468,7 @@ USE AT YOUR OWN RISK.";
             this.FormBorderStyle = FormBorderStyle.Sizable;
             this.MaximizeBox = true;
             this.MinimizeBox = false;
+            this.ShowInTaskbar = false;
             this.MinimumSize = new Size(500, 400);
             this.ControlBox = false; // Prevent user from closing during restore
 

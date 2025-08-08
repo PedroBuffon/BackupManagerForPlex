@@ -60,6 +60,7 @@ namespace PlexBackupApp
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
+            ShowInTaskbar = false;
 
             var mainPanel = new TableLayoutPanel
             {

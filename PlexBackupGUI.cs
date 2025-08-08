@@ -535,7 +535,7 @@ namespace PlexBackupApp
         private void BtnScheduleBackup_Click(object sender, EventArgs e)
         {
             var scheduleForm = new ScheduleBackupForm();
-            scheduleForm.ShowDialog();
+            scheduleForm.ShowDialog(this);
         }
 
         private void BtnViewBackups_Click(object sender, EventArgs e)
@@ -547,13 +547,13 @@ namespace PlexBackupApp
             }
 
             var backupViewForm = new BackupViewForm(config.BackupPath);
-            backupViewForm.ShowDialog();
+            backupViewForm.ShowDialog(this);
         }
 
         private void BtnSettings_Click(object sender, EventArgs e)
         {
             var settingsForm = new AdvancedSettingsForm(config);
-            if (settingsForm.ShowDialog() == DialogResult.OK)
+            if (settingsForm.ShowDialog(this) == DialogResult.OK)
             {
                 // Settings were changed, reload UI and apply interface settings
                 LoadConfigurationToUI();
@@ -1536,6 +1536,8 @@ namespace PlexBackupApp
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.Sizable;
             this.MinimumSize = new Size(650, 400);
+            this.ShowInTaskbar = false;
+            this.MaximizeBox = false;
 
             // Create main panel
             var mainPanel = new Panel
@@ -1739,7 +1741,7 @@ namespace PlexBackupApp
         private void ShowRestoreOptions(BackupInfo backup)
         {
             var restoreOptionsForm = new RestoreOptionsForm(backup);
-            restoreOptionsForm.ShowDialog();
+            restoreOptionsForm.ShowDialog(this);
         }
 
         private void DgvBackups_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
@@ -2201,6 +2203,7 @@ namespace PlexBackupApp
                 
                 // Create and show progress form
                 var progressForm = new RestoreProgressForm();
+                progressForm.Owner = this;
                 progressForm.Show();
                 
                 // Add initial logs to progress form
@@ -2319,6 +2322,7 @@ namespace PlexBackupApp
                             try
                             {
                                 var rollbackProgress = new RestoreProgressForm();
+                                rollbackProgress.Owner = this;
                                 rollbackProgress.Show();
                                 await Task.Run(() => RollbackToSafetyBackup(safetyBackupPath, rollbackProgress));
                                 rollbackProgress.Close();
@@ -3292,6 +3296,7 @@ namespace PlexBackupApp
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
+            ShowInTaskbar = false;
 
             var mainPanel = new Panel
             {
@@ -3436,7 +3441,7 @@ namespace PlexBackupApp
             
             // Show SSH restore form
             var sshRestoreForm = new LinuxSSHRestoreForm(backupInfo);
-            sshRestoreForm.ShowDialog();
+            sshRestoreForm.ShowDialog(this);
         }
     }
 
@@ -3479,6 +3484,7 @@ namespace PlexBackupApp
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
+            this.ShowInTaskbar = false;
             this.BackColor = SystemColors.Control;
 
             var mainPanel = new TableLayoutPanel
