@@ -440,4 +440,235 @@ USE AT YOUR OWN RISK.";
             this.Controls.Add(label);
         }
     }
+
+    // Restore Progress Form
+    public class RestoreProgressForm : Form
+    {
+        private Label lblStatus;
+        private ProgressBar progressBar;
+        private Label lblOperation;
+        private RichTextBox txtLog;
+        private Panel logPanel;
+
+        public RestoreProgressForm()
+        {
+            InitializeProgressForm();
+        }
+
+        private void InitializeProgressForm()
+        {
+            this.Text = "Restoring Backup...";
+            this.Size = new Size(600, 500);
+            this.StartPosition = FormStartPosition.CenterParent;
+            this.FormBorderStyle = FormBorderStyle.Sizable;
+            this.MaximizeBox = true;
+            this.MinimizeBox = false;
+            this.MinimumSize = new Size(500, 400);
+            this.ControlBox = false; // Prevent user from closing during restore
+
+            // Create main container
+            var mainContainer = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 2,
+                Padding = new Padding(10)
+            };
+
+            // Progress section (top)
+            var progressPanel = new Panel
+            {
+                Height = 150,
+                Dock = DockStyle.Fill
+            };
+
+            var progressContainer = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 4,
+                Padding = new Padding(5)
+            };
+
+            // Title
+            var lblTitle = new Label
+            {
+                Text = "Restoring Plex Backup",
+                Font = new Font("Arial", 12F, FontStyle.Bold),
+                AutoSize = true,
+                Anchor = AnchorStyles.Top,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Dock = DockStyle.Fill
+            };
+
+            // Status
+            lblStatus = new Label
+            {
+                Text = "Preparing restore operation...",
+                AutoSize = false,
+                Height = 25,
+                Anchor = AnchorStyles.Left | AnchorStyles.Right,
+                Font = new Font("Arial", 9F, FontStyle.Bold),
+                ForeColor = Color.DarkBlue,
+                Dock = DockStyle.Fill
+            };
+
+            // Progress bar
+            progressBar = new ProgressBar
+            {
+                Style = ProgressBarStyle.Marquee,
+                MarqueeAnimationSpeed = 50,
+                Height = 25,
+                Dock = DockStyle.Fill
+            };
+
+            // Operation details
+            lblOperation = new Label
+            {
+                Text = "Please wait while the backup is being restored...",
+                AutoSize = false,
+                Height = 40,
+                Anchor = AnchorStyles.Left | AnchorStyles.Right,
+                Font = new Font("Arial", 8F, FontStyle.Italic),
+                ForeColor = Color.Gray,
+                Dock = DockStyle.Fill
+            };
+
+            progressContainer.Controls.Add(lblTitle, 0, 0);
+            progressContainer.Controls.Add(lblStatus, 0, 1);
+            progressContainer.Controls.Add(progressBar, 0, 2);
+            progressContainer.Controls.Add(lblOperation, 0, 3);
+
+            progressPanel.Controls.Add(progressContainer);
+
+            // Log section (bottom)
+            logPanel = new Panel
+            {
+                Dock = DockStyle.Fill
+            };
+
+            var logLabel = new Label
+            {
+                Text = "Restore Log:",
+                Font = new Font("Arial", 9F, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(5, 5)
+            };
+
+            txtLog = new RichTextBox
+            {
+                Location = new Point(5, 25),
+                Size = new Size(logPanel.Width - 10, logPanel.Height - 30),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+                BackColor = Color.Black,
+                ForeColor = Color.LightGray,
+                Font = new Font("Consolas", 8F),
+                ReadOnly = true,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
+                WordWrap = false
+            };
+
+            logPanel.Controls.Add(logLabel);
+            logPanel.Controls.Add(txtLog);
+
+            // Add panels to main container
+            mainContainer.Controls.Add(progressPanel, 0, 0);
+            mainContainer.Controls.Add(logPanel, 0, 1);
+
+            // Set row styles
+            mainContainer.RowStyles.Add(new RowStyle(SizeType.Absolute, 150F));
+            mainContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            this.Controls.Add(mainContainer);
+
+            // Add initial log entry
+            LogMessage("Restore operation initialized", Color.Cyan);
+        }
+
+        private void LogMessage(string message, Color color)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action<string, Color>(LogMessage), message, color);
+                return;
+            }
+
+            txtLog.SelectionStart = txtLog.TextLength;
+            txtLog.SelectionLength = 0;
+            txtLog.SelectionColor = color;
+            txtLog.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}\n");
+            txtLog.SelectionColor = txtLog.ForeColor;
+            txtLog.ScrollToCaret();
+        }
+
+        public void UpdateStatus(string status)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action<string>(UpdateStatus), status);
+                return;
+            }
+            lblStatus.Text = status;
+            LogMessage($"STATUS: {status}", Color.LightBlue);
+            this.Refresh();
+        }
+
+        public void UpdateOperation(string operation)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action<string>(UpdateOperation), operation);
+                return;
+            }
+            lblOperation.Text = operation;
+            LogMessage($"OPERATION: {operation}", Color.LightGray);
+            this.Refresh();
+        }
+
+        public void LogInfo(string message)
+        {
+            LogMessage($"INFO: {message}", Color.LightGreen);
+        }
+
+        public void LogError(string message)
+        {
+            LogMessage($"ERROR: {message}", Color.Red);
+        }
+
+        public void LogWarning(string message)
+        {
+            LogMessage($"WARNING: {message}", Color.Yellow);
+        }
+
+        public void UpdateProgress(int percentage)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action<int>(UpdateProgress), percentage);
+                return;
+            }
+            
+            // Switch to continuous style when we have actual progress
+            if (progressBar.Style != ProgressBarStyle.Continuous)
+            {
+                progressBar.Style = ProgressBarStyle.Continuous;
+                progressBar.Minimum = 0;
+                progressBar.Maximum = 100;
+            }
+            
+            progressBar.Value = Math.Min(percentage, 100);
+            LogMessage($"PROGRESS: {percentage}%", Color.Cyan);
+            this.Refresh();
+        }
+
+        public string GetAllLogs()
+        {
+            if (this.InvokeRequired)
+            {
+                return (string)this.Invoke(new Func<string>(GetAllLogs));
+            }
+            
+            return txtLog.Text;
+        }
+    }
 }
