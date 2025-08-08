@@ -46,7 +46,7 @@ A modern and complete Windows Forms application for backing up Plex Media Server
 
 - 🗂️ **View Backups** - Lists all existing backups with details
 - 📅 **Schedule Backup** - Interface to configure automatic backups
-- 🔄 **Restore Backup** - Restore functionality (in development)
+- 🔄 **Restore Backup** - Restore functionality
 - ⚙️ **Advanced Settings** - Complete configuration management
   - Log level configuration (Debug, Info, Warning, Error)
   - UI preferences (minimize to tray)
@@ -94,9 +94,9 @@ A modern and complete Windows Forms application for backing up Plex Media Server
 #### 🔘 Action Buttons
 
 - **Backup Now**: Execute immediate backup
-- **Schedule Backup**: Schedule automatic backups (in development)
+- **Schedule Backup**: Schedule automatic backups
 - **View Backups**: View existing backups
-- **Restore**: Restore selected backup (in development)
+- **Restore**: Restore selected backup
 - **Settings**: Advanced settings (in development)
 
 #### 📊 Log and Status
