@@ -29,451 +29,7 @@ namespace PlexBackupApp
     /// Last Updated: 22/07/2025
     /// </summary>
     
-    // Configuration class for JSON serialization
-    public class PlexBackupConfig
-    {
-        public string BackupPath { get; set; } = "";
-        public bool IncludeRegistry { get; set; } = true;
-        public bool IncludeFiles { get; set; } = true;
-        public bool IncludeLogs { get; set; } = false;
-        public bool StopPlex { get; set; } = true;
-        public int RetentionDays { get; set; } = 2; // Index for combobox (30 days default)
-        public DateTime LastBackup { get; set; } = DateTime.MinValue;
-        public int TotalBackupsCreated { get; set; } = 0;
-        public bool MinimizeToTray { get; set; } = false;
-        public bool ShowNotifications { get; set; } = true;
-        public bool AutoStartWithWindows { get; set; } = false;
-        public string LogLevel { get; set; } = "Info"; // Debug, Info, Warning, Error
-        public bool HasShownTrayNotification { get; set; } = false;
-        public bool HasAcceptedLicense { get; set; } = false;
-        public bool EnableRollback { get; set; } = true;
-        public int MaxRollbackAttempts { get; set; } = 3;
-        public string CompressionType { get; set; } = "None"; // None, Zip, 7z, Gzip
-        public int CompressionLevel { get; set; } = 6; // 1-9 for compression level
-    }
 
-    // Rollback state management
-    public class BackupRollbackState
-    {
-        public bool PlexWasRunning { get; set; } = false;
-        public string BackupDestination { get; set; } = "";
-        public List<string> CreatedDirectories { get; set; } = new List<string>();
-        public List<string> CreatedFiles { get; set; } = new List<string>();
-        public Dictionary<string, string> OriginalFileBackups { get; set; } = new Dictionary<string, string>();
-        public DateTime BackupStartTime { get; set; } = DateTime.Now;
-        public bool RegistryBackupCompleted { get; set; } = false;
-        public bool FileBackupCompleted { get; set; } = false;
-        public string TempRollbackPath { get; set; } = "";
-    }
-
-    // Restore Complete Result Window
-    public partial class RestoreCompleteForm : Form
-    {
-        private readonly string restoreMessage;
-        private readonly string fullLogContent;
-        private readonly bool isSuccess;
-        
-        public RestoreCompleteForm(string message, string logContent, bool success)
-        {
-            restoreMessage = message;
-            fullLogContent = logContent;
-            isSuccess = success;
-            InitializeRestoreCompleteForm();
-        }
-        
-        private void InitializeRestoreCompleteForm()
-        {
-            // Form properties
-            Text = isSuccess ? "Restore Complete" : "Restore Failed";
-            Size = new Size(500, 300);
-            StartPosition = FormStartPosition.CenterParent;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox = false;
-            MinimizeBox = false;
-            
-            // Apply consistent theme with main window (system default)
-            BackColor = SystemColors.Control;
-            ForeColor = SystemColors.ControlText;
-            
-            // Message label
-            var lblMessage = new Label
-            {
-                Text = restoreMessage,
-                Location = new Point(20, 20),
-                Size = new Size(440, 150),
-                Font = new Font("Segoe UI", 9F),
-                AutoSize = false,
-                ForeColor = SystemColors.ControlText,
-                BackColor = SystemColors.Control
-            };
-            
-            // Show Logs button
-            var btnShowLogs = new Button
-            {
-                Text = "Show Detailed Logs",
-                Location = new Point(20, 190),
-                Size = new Size(150, 30),
-                Font = new Font("Segoe UI", 9F),
-                UseVisualStyleBackColor = true
-            };
-            btnShowLogs.Click += BtnShowLogs_Click;
-            
-            // OK button
-            var btnOK = new Button
-            {
-                Text = "OK",
-                Location = new Point(390, 190),
-                Size = new Size(75, 30),
-                Font = new Font("Segoe UI", 9F),
-                DialogResult = DialogResult.OK,
-                UseVisualStyleBackColor = true
-            };
-            
-            // Add controls
-            Controls.AddRange(new Control[] { lblMessage, btnShowLogs, btnOK });
-            
-            // Set accept button
-            AcceptButton = btnOK;
-        }
-        
-        private void BtnShowLogs_Click(object sender, EventArgs e)
-        {
-            var logForm = new RestoreLogViewerForm(fullLogContent);
-            logForm.ShowDialog(this);
-        }
-    }
-    
-    // Restore Log Viewer Window
-    public partial class RestoreLogViewerForm : Form
-    {
-        public RestoreLogViewerForm(string logContent)
-        {
-            InitializeLogViewerForm(logContent);
-        }
-        
-        private void InitializeLogViewerForm(string logContent)
-        {
-            // Form properties
-            Text = "Restore Process Logs";
-            Size = new Size(800, 600);
-            StartPosition = FormStartPosition.CenterParent;
-            FormBorderStyle = FormBorderStyle.Sizable;
-            MinimumSize = new Size(600, 400);
-            
-            // Apply consistent theme with main window (system default)
-            BackColor = SystemColors.Control;
-            ForeColor = SystemColors.ControlText;
-            
-            // Log text box
-            var txtLogs = new RichTextBox
-            {
-                Location = new Point(10, 10),
-                Size = new Size(760, 500),
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-                ReadOnly = true,
-                Font = new Font("Consolas", 9F),
-                BackColor = SystemColors.Window,
-                ForeColor = SystemColors.WindowText,
-                Text = logContent,
-                WordWrap = true,
-                BorderStyle = BorderStyle.Fixed3D
-            };
-            
-            // Format the log content with colors
-            FormatLogContent(txtLogs);
-            
-            // Copy Logs button
-            var btnCopyLogs = new Button
-            {
-                Text = "Copy to Clipboard",
-                Location = new Point(10, 520),
-                Size = new Size(120, 30),
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
-                Font = new Font("Segoe UI", 9F),
-                UseVisualStyleBackColor = true
-            };
-            btnCopyLogs.Click += (s, e) => {
-                try
-                {
-                    Clipboard.SetText(logContent);
-                    MessageBox.Show("Logs copied to clipboard!", "Copy Complete", 
-                                  MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                catch
-                {
-                    MessageBox.Show("Failed to copy logs to clipboard.", "Copy Failed", 
-                                  MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-            };
-            
-            // Close button
-            var btnClose = new Button
-            {
-                Text = "Close",
-                Location = new Point(695, 520),
-                Size = new Size(75, 30),
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
-                Font = new Font("Segoe UI", 9F),
-                DialogResult = DialogResult.OK,
-                UseVisualStyleBackColor = true
-            };
-            
-            // Add controls
-            Controls.AddRange(new Control[] { txtLogs, btnCopyLogs, btnClose });
-            
-            // Set accept button
-            AcceptButton = btnClose;
-        }
-        
-        private void FormatLogContent(RichTextBox txtLogs)
-        {
-            string[] lines = txtLogs.Text.Split('\n');
-            txtLogs.Text = "";
-            
-            foreach (string line in lines)
-            {
-                if (line.Contains("ERROR") || line.Contains("FAILED"))
-                {
-                    txtLogs.SelectionColor = Color.FromArgb(192, 0, 0); // Dark red for light theme
-                }
-                else if (line.Contains("WARNING") || line.Contains("WARN"))
-                {
-                    txtLogs.SelectionColor = Color.FromArgb(255, 140, 0); // Dark orange for light theme
-                }
-                else if (line.Contains("SUCCESS") || line.Contains("COMPLETED"))
-                {
-                    txtLogs.SelectionColor = Color.FromArgb(0, 128, 0); // Dark green for light theme
-                }
-                else if (line.Contains("INFO") || line.Contains("PROGRESS"))
-                {
-                    txtLogs.SelectionColor = Color.FromArgb(0, 0, 192); // Dark blue for light theme
-                }
-                else if (line.Contains("STATUS") || line.Contains("OPERATION"))
-                {
-                    txtLogs.SelectionColor = Color.FromArgb(64, 64, 64); // Dark gray for status
-                }
-                else if (line.Contains("DEBUG"))
-                {
-                    txtLogs.SelectionColor = Color.FromArgb(128, 0, 128); // Dark magenta for debug
-                }
-                else
-                {
-                    txtLogs.SelectionColor = SystemColors.WindowText; // Default system text color
-                }
-                
-                txtLogs.AppendText(line + "\n");
-            }
-            
-            // Scroll to top
-            txtLogs.SelectionStart = 0;
-            txtLogs.ScrollToCaret();
-        }
-    }
-
-    // License Agreement Form
-    public partial class LicenseAgreementForm : Form
-    {
-        private RichTextBox txtLicense;
-        private Button btnAccept;
-        private Button btnDecline;
-        private CheckBox chkAgree;
-        
-        public bool LicenseAccepted { get; private set; } = false;
-        
-        public LicenseAgreementForm()
-        {
-            InitializeLicenseForm();
-        }
-        
-        private void InitializeLicenseForm()
-        {
-            // Form properties
-            Text = "License Agreement - Backup Manager For Plex";
-            Size = new Size(700, 600);
-            StartPosition = FormStartPosition.CenterScreen;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox = false;
-            MinimizeBox = false;
-            BackColor = SystemColors.Control;
-            ForeColor = SystemColors.ControlText;
-            
-            // Main container
-            var mainPanel = new TableLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 4,
-                Padding = new Padding(20)
-            };
-            
-            // Row styles
-            mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Title
-            mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // License text
-            mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Checkbox
-            mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Buttons
-            
-            // Title label
-            var lblTitle = new Label
-            {
-                Text = "SOFTWARE LICENSE AGREEMENT",
-                Font = new Font("Arial", 14F, FontStyle.Bold),
-                ForeColor = SystemColors.ControlText,
-                AutoSize = true,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Margin = new Padding(0, 0, 0, 20)
-            };
-            
-            // License text box
-            txtLicense = new RichTextBox
-            {
-                ReadOnly = true,
-                BackColor = SystemColors.Window,
-                ForeColor = SystemColors.WindowText,
-                BorderStyle = BorderStyle.Fixed3D,
-                Dock = DockStyle.Fill,
-                Font = new Font("Consolas", 9F),
-                Margin = new Padding(0, 0, 0, 20)
-            };
-            
-            // Load license text
-            LoadLicenseText();
-            
-            // Agreement checkbox
-            chkAgree = new CheckBox
-            {
-                Text = "I have read and agree to the terms of this license agreement",
-                Font = new Font("Arial", 10F),
-                ForeColor = SystemColors.ControlText,
-                AutoSize = true,
-                Margin = new Padding(0, 0, 0, 20)
-            };
-            chkAgree.CheckedChanged += ChkAgree_CheckedChanged;
-            
-            // Button panel
-            var buttonPanel = new FlowLayoutPanel
-            {
-                FlowDirection = FlowDirection.RightToLeft,
-                AutoSize = true,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right
-            };
-            
-            // Decline button
-            btnDecline = new Button
-            {
-                Text = "Decline",
-                Size = new Size(100, 35),
-                FlatStyle = FlatStyle.System,
-                DialogResult = DialogResult.Cancel,
-                Margin = new Padding(10, 0, 0, 0)
-            };
-            btnDecline.Click += BtnDecline_Click;
-            
-            // Accept button
-            btnAccept = new Button
-            {
-                Text = "Accept",
-                Size = new Size(100, 35),
-                FlatStyle = FlatStyle.System,
-                Enabled = false,
-                DialogResult = DialogResult.OK,
-                Margin = new Padding(10, 0, 0, 0)
-            };
-            btnAccept.Click += BtnAccept_Click;
-            
-            // Add buttons to panel
-            buttonPanel.Controls.Add(btnDecline);
-            buttonPanel.Controls.Add(btnAccept);
-            
-            // Add controls to main panel
-            mainPanel.Controls.Add(lblTitle, 0, 0);
-            mainPanel.Controls.Add(txtLicense, 0, 1);
-            mainPanel.Controls.Add(chkAgree, 0, 2);
-            mainPanel.Controls.Add(buttonPanel, 0, 3);
-            
-            Controls.Add(mainPanel);
-        }
-        
-        private void LoadLicenseText()
-        {
-            try
-            {
-                string licensePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "LICENSE");
-                if (File.Exists(licensePath))
-                {
-                    string licenseContent = File.ReadAllText(licensePath);
-                    txtLicense.Text = licenseContent;
-                }
-                else
-                {
-                    // Fallback license text
-                    txtLicense.Text = @"MIT License
-
-Copyright (c) 2025 Pedro Buffon
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the ""Backup Manager For Plex""), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED ""AS IS"", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-===============================================================================
-
-DISCLAIMER:
-
-This software is an independent third-party tool and is not affiliated with, 
-endorsed by, or sponsored by Plex, Inc. 
-
-""Plex"" and ""Plex Media Server"" are trademarks of Plex, Inc. This software 
-interacts with Plex Media Server installations through standard file system 
-operations and publicly available interfaces, but does not redistribute, 
-modify, or reverse engineer any Plex, Inc. proprietary software.
-
-Users are responsible for ensuring their use of this software complies with 
-Plex, Inc.'s Terms of Service and any applicable licensing agreements.
-
-The authors of this software assume no responsibility for any data loss, 
-system damage, or violations of third-party terms of service that may result 
-from the use of this software.
-
-USE AT YOUR OWN RISK.";
-                }
-            }
-            catch (Exception ex)
-            {
-                txtLicense.Text = "Error loading license file: " + ex.Message + "\n\nPlease contact the developer for license information.";
-            }
-        }
-        
-        private void ChkAgree_CheckedChanged(object sender, EventArgs e)
-        {
-            btnAccept.Enabled = chkAgree.Checked;
-        }
-        
-        private void BtnAccept_Click(object sender, EventArgs e)
-        {
-            LicenseAccepted = true;
-            Close();
-        }
-        
-        private void BtnDecline_Click(object sender, EventArgs e)
-        {
-            LicenseAccepted = false;
-            Close();
-        }
-    }
 
     public partial class PlexBackupForm : Form
     {
@@ -1961,25 +1517,6 @@ USE AT YOUR OWN RISK.";
     }
 
     // Additional Forms (placeholder implementations)
-    public class ScheduleBackupForm : Form
-    {
-        public ScheduleBackupForm()
-        {
-            this.Text = "Schedule Backup";
-            this.Size = new Size(400, 300);
-            this.StartPosition = FormStartPosition.CenterParent;
-            
-            var label = new Label
-            {
-                Text = "Schedule backup functionality\nwill be implemented here.",
-                Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-            
-            this.Controls.Add(label);
-        }
-    }
-
     public class BackupViewForm : Form
     {
         private string backupPath;
@@ -2190,13 +1727,19 @@ USE AT YOUR OWN RISK.";
 
                 if (columnName == "Restore")
                 {
-                    RestoreBackup(backup);
+                    ShowRestoreOptions(backup);
                 }
                 else if (columnName == "Delete")
                 {
                     DeleteBackup(backup);
                 }
             }
+        }
+
+        private void ShowRestoreOptions(BackupInfo backup)
+        {
+            var restoreOptionsForm = new RestoreOptionsForm(backup);
+            restoreOptionsForm.ShowDialog();
         }
 
         private void DgvBackups_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
@@ -3724,277 +3267,176 @@ USE AT YOUR OWN RISK.";
         }
     }
 
-    // Helper class for backup data
-    public class BackupInfo
+
+
+    // Restore Options Form - Choose between Local and SSH restore
+    public class RestoreOptionsForm : Form
     {
-        public string BackupName { get; set; }
-        public string DateCreated { get; set; }
-        public string Size { get; set; }
-        public string FullPath { get; set; }
-        public bool IsCompressed { get; set; } = false;
-    }
+        private BackupInfo backupInfo;
+        private Button btnLocalRestore;
+        private Button btnSSHRestore;
+        private Button btnCancel;
+        private Label lblDescription;
 
-    // Restore operation logger
-    public class RestoreLogger
-    {
-        private List<string> infoLogs = new List<string>();
-        private List<string> errorLogs = new List<string>();
-        private DateTime startTime;
-        
-        public RestoreLogger()
+        public RestoreOptionsForm(BackupInfo backup)
         {
-            startTime = DateTime.Now;
+            backupInfo = backup;
+            InitializeForm();
         }
-        
-        public void LogInfo(string message)
+
+        private void InitializeForm()
         {
-            var logEntry = $"[{DateTime.Now:HH:mm:ss}] INFO: {message}";
-            infoLogs.Add(logEntry);
-        }
-        
-        public void LogError(string message)
-        {
-            var logEntry = $"[{DateTime.Now:HH:mm:ss}] ERROR: {message}";
-            errorLogs.Add(logEntry);
-        }
-        
-        public string GetSummary()
-        {
-            var duration = DateTime.Now - startTime;
-            var summary = $"Operation Duration: {duration:mm\\:ss}\n";
-            summary += $"Steps Completed: {infoLogs.Count}\n";
-            if (errorLogs.Count > 0)
+            Text = "Choose Restore Method";
+            Size = new Size(500, 280);
+            StartPosition = FormStartPosition.CenterParent;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+
+            var mainPanel = new Panel
             {
-                summary += $"Errors Encountered: {errorLogs.Count}\n";
-            }
-            return summary;
-        }
-        
-        public string GetErrorLog()
-        {
-            return string.Join("\n", errorLogs);
-        }
-        
-        public string GetFullLog()
-        {
-            var allLogs = new List<string>();
-            allLogs.AddRange(infoLogs);
-            allLogs.AddRange(errorLogs);
-            return string.Join("\n", allLogs.OrderBy(log => log));
-        }
-    }
+                Dock = DockStyle.Fill,
+                Padding = new Padding(20)
+            };
 
-    // Validation and safety methods for restore operations
-    public static class RestoreUtilities
-    {
-        public static bool ValidateBackupIntegrity(string backupPath)
-        {
-            try
+            // Title
+            var lblTitle = new Label
             {
-                // Check if the path exists as a file (ZIP) or directory
-                bool isZipFile = File.Exists(backupPath) && Path.GetExtension(backupPath).ToLower() == ".zip";
-                bool isDirectory = Directory.Exists(backupPath);
-                
-                if (!isZipFile && !isDirectory)
-                    return false;
-                
-                // Check if it's a ZIP file (compressed backup)
-                if (isZipFile)
-                {
-                    return ValidateZipBackupIntegrity(backupPath);
-                }
-                
-                // Handle directory backup (uncompressed backup)
-                // Check for essential backup components
-                var regBackupPath = Path.Combine(backupPath, "RegBackup");
-                var fileBackupPath = Path.Combine(backupPath, "FileBackup");
-                
-                // At least one backup type should exist
-                bool hasRegBackup = Directory.Exists(regBackupPath) && Directory.GetFiles(regBackupPath, "*.reg").Length > 0;
-                bool hasFileBackup = Directory.Exists(fileBackupPath) && Directory.GetDirectories(fileBackupPath).Length > 0;
-                
-                if (!hasRegBackup && !hasFileBackup)
-                    return false;
+                Text = $"Restore Backup: {backupInfo.BackupName}",
+                Font = new Font("Arial", 12F, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(0, 0)
+            };
 
-                // If file backup exists, verify critical Plex files
-                if (hasFileBackup)
-                {
-                    var criticalFiles = new[] {
-                        "Preferences.xml",
-                        "Plug-in Support\\Databases\\com.plexapp.plugins.library.db"
-                    };
-
-                    foreach (var criticalFile in criticalFiles)
-                    {
-                        var fullPath = Path.Combine(fileBackupPath, criticalFile);
-                        if (File.Exists(fullPath) && new FileInfo(fullPath).Length > 0)
-                            return true; // At least one critical file exists and has content
-                    }
-                }
-
-                return hasRegBackup; // If no file backup verification possible, registry backup is sufficient
-            }
-            catch
+            // Description
+            lblDescription = new Label
             {
-                return false;
-            }
+                Text = "Choose how you would like to restore this backup:",
+                AutoSize = true,
+                Location = new Point(0, 40),
+                Font = new Font("Segoe UI", 9F)
+            };
+
+            // Local Restore Button
+            btnLocalRestore = new Button
+            {
+                Text = "Local Restore",
+                Size = new Size(200, 60),
+                Location = new Point(50, 80),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                BackColor = Color.LightBlue,
+                UseVisualStyleBackColor = false
+            };
+            btnLocalRestore.Click += BtnLocalRestore_Click;
+
+            // SSH Restore Button  
+            btnSSHRestore = new Button
+            {
+                Text = "Linux SSH Restore",
+                Size = new Size(200, 60),
+                Location = new Point(270, 80),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                BackColor = Color.LightGreen,
+                UseVisualStyleBackColor = false
+            };
+            btnSSHRestore.Click += BtnSSHRestore_Click;
+
+            // Description labels
+            var lblLocalDesc = new Label
+            {
+                Text = "Restore to this Windows computer\n(overwrites current Plex data)",
+                Location = new Point(50, 150),
+                Size = new Size(200, 40),
+                Font = new Font("Segoe UI", 8F),
+                ForeColor = Color.DarkBlue,
+                TextAlign = ContentAlignment.TopCenter
+            };
+
+            var lblSSHDesc = new Label
+            {
+                Text = "Restore to a Linux server via SSH\n(requires SSH access)",
+                Location = new Point(270, 150),
+                Size = new Size(200, 40),
+                Font = new Font("Segoe UI", 8F),
+                ForeColor = Color.DarkGreen,
+                TextAlign = ContentAlignment.TopCenter
+            };
+
+            // Cancel button
+            btnCancel = new Button
+            {
+                Text = "Cancel",
+                Size = new Size(80, 30),
+                Location = new Point(200, 210),
+                DialogResult = DialogResult.Cancel
+            };
+
+            mainPanel.Controls.AddRange(new Control[] { 
+                lblTitle, lblDescription, 
+                btnLocalRestore, btnSSHRestore, 
+                lblLocalDesc, lblSSHDesc, btnCancel 
+            });
+
+            Controls.Add(mainPanel);
+
+            // Check SSH availability for the SSH button
+            CheckSSHAvailability();
         }
 
-        private static bool ValidateZipBackupIntegrity(string zipPath)
+        private void CheckSSHAvailability()
         {
-            try
+            string requirements = SSHRestoreUtilities.GetSSHRequirementsMessage();
+            if (!string.IsNullOrEmpty(requirements))
             {
-                using (var archive = ZipFile.OpenRead(zipPath))
-                {
-                    // Basic validation: ZIP file should have entries and be readable
-                    if (archive.Entries.Count == 0)
-                        return false;
-                    
-                    // Check for backup-related content (more flexible approach)
-                    var hasBackupContent = archive.Entries.Any(e => 
-                        e.FullName.Contains("RegBackup") || 
-                        e.FullName.Contains("FileBackup") ||
-                        e.FullName.Contains("Preferences.xml") ||
-                        e.FullName.Contains("library.db") ||
-                        e.FullName.EndsWith(".reg"));
-                    
-                    return hasBackupContent;
-                }
-            }
-            catch
-            {
-                return false;
+                btnSSHRestore.Enabled = false;
+                btnSSHRestore.BackColor = Color.LightGray;
+                btnSSHRestore.Text = "SSH Unavailable";
+                
+                // Add tooltip with requirements
+                var toolTip = new ToolTip();
+                toolTip.SetToolTip(btnSSHRestore, requirements);
             }
         }
 
-        public static bool CheckDiskSpaceForRestore(string backupPath)
+        private void BtnLocalRestore_Click(object sender, EventArgs e)
         {
-            try
-            {
-                long backupSize;
-                
-                // Check if it's a ZIP file (compressed backup)
-                if (File.Exists(backupPath) && Path.GetExtension(backupPath).ToLower() == ".zip")
-                {
-                    // For ZIP files, we need to estimate uncompressed size
-                    // Use ZIP file size * 3 as a conservative estimate for uncompressed size
-                    backupSize = new FileInfo(backupPath).Length * 3;
-                }
-                else if (Directory.Exists(backupPath))
-                {
-                    // Calculate backup size for directory
-                    backupSize = GetDirectorySize(new DirectoryInfo(backupPath));
-                }
-                else
-                {
-                    return false; // Path doesn't exist
-                }
-                
-                // Get available space on target drive (usually C:)
-                var targetDrive = new DriveInfo(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData).Substring(0, 1));
-                var availableSpace = targetDrive.AvailableFreeSpace;
-                
-                // Require at least 2x the backup size for safety (temp files, etc.)
-                var requiredSpace = backupSize * 2;
-                
-                return availableSpace > requiredSpace;
-            }
-            catch
-            {
-                return true; // If we can't check, assume it's OK
-            }
-        }
-
-        public static string CreateSafetyBackup()
-        {
-            var safetyBackupPath = Path.Combine(Path.GetTempPath(), $"PlexSafetyBackup_{DateTime.Now:yyyyMMdd_HHmmss}");
-            Directory.CreateDirectory(safetyBackupPath);
-
-            var plexDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plex Media Server");
+            DialogResult = DialogResult.OK;
+            Close();
             
-            if (Directory.Exists(plexDataPath))
-            {
-                // Create a quick backup of critical files only (for speed)
-                var criticalPaths = new[]
-                {
-                    "Preferences.xml",
-                    "Plug-in Support\\Databases",
-                    "Media\\localhost"
-                };
-
-                foreach (var criticalPath in criticalPaths)
-                {
-                    var sourcePath = Path.Combine(plexDataPath, criticalPath);
-                    var destPath = Path.Combine(safetyBackupPath, criticalPath);
-                    
-                    try
-                    {
-                        if (File.Exists(sourcePath))
-                        {
-                            Directory.CreateDirectory(Path.GetDirectoryName(destPath));
-                            File.Copy(sourcePath, destPath, true);
-                        }
-                        else if (Directory.Exists(sourcePath))
-                        {
-                            CopyDirectory(sourcePath, destPath);
-                        }
-                    }
-                    catch
-                    {
-                        // Continue with other files if one fails
-                    }
-                }
-            }
-
-            return safetyBackupPath;
-        }
-
-        public static void CopyDirectory(string sourceDir, string destDir)
-        {
-            Directory.CreateDirectory(destDir);
+            // Create a new BackupViewForm instance to call the original restore method
+            var backupViewForm = new BackupViewForm(Path.GetDirectoryName(backupInfo.FullPath));
             
-            foreach (var file in Directory.GetFiles(sourceDir))
-            {
-                var destFile = Path.Combine(destDir, Path.GetFileName(file));
-                File.Copy(file, destFile, true);
-            }
+            // Use reflection to call the private RestoreBackup method
+            var method = typeof(BackupViewForm).GetMethod("RestoreBackup", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             
-            foreach (var subDir in Directory.GetDirectories(sourceDir))
+            if (method != null)
             {
-                var destSubDir = Path.Combine(destDir, Path.GetFileName(subDir));
-                CopyDirectory(subDir, destSubDir);
+                method.Invoke(backupViewForm, new object[] { backupInfo });
+            }
+            else
+            {
+                MessageBox.Show("Unable to perform local restore. Please try again.", "Restore Error", 
+                              MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        public static bool VerifyRestoredData(string plexDataPath)
+        private void BtnSSHRestore_Click(object sender, EventArgs e)
         {
-            try
+            // Check SSH requirements first
+            string requirements = SSHRestoreUtilities.GetSSHRequirementsMessage();
+            if (!string.IsNullOrEmpty(requirements))
             {
-                // Check if critical files exist and have reasonable sizes
-                var preferencesFile = Path.Combine(plexDataPath, "Preferences.xml");
-                if (File.Exists(preferencesFile) && new FileInfo(preferencesFile).Length > 100)
-                    return true;
-
-                var databaseFile = Path.Combine(plexDataPath, "Plug-in Support", "Databases", "com.plexapp.plugins.library.db");
-                if (File.Exists(databaseFile) && new FileInfo(databaseFile).Length > 1000)
-                    return true;
-
-                return false;
+                MessageBox.Show(requirements, "SSH Requirements", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
-            catch
-            {
-                return false;
-            }
-        }
 
-        private static long GetDirectorySize(DirectoryInfo dirInfo)
-        {
-            long size = 0;
-            foreach (FileInfo file in dirInfo.GetFiles("*", SearchOption.AllDirectories))
-            {
-                size += file.Length;
-            }
-            return size;
+            DialogResult = DialogResult.OK;
+            Close();
+            
+            // Show SSH restore form
+            var sshRestoreForm = new LinuxSSHRestoreForm(backupInfo);
+            sshRestoreForm.ShowDialog();
         }
     }
 
